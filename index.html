@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>云游山河 · 心脏康复集章之旅</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ 主页 ============ -->
+  <section id="screen-home" class="screen">
+    <header class="home-hero">
+      <div class="hero-stamp stamp-lg">游</div>
+      <div>
+        <h1>云游山河</h1>
+        <p class="subtitle">心脏康复 · 集章之旅</p>
+      </div>
+      <div class="hero-stamp stamp-lg stamp-red">康</div>
+    </header>
+
+    <p class="home-intro">原地踏步，云游中国十二景；抬手摘印，集齐通关文牒。<br>每天一段，让康复像旅行一样有趣。</p>
+
+    <button id="btn-start" class="btn btn-primary btn-xl">🚶 开始今日旅程</button>
+
+    <div class="stat-cards">
+      <div class="stat-card"><div class="stat-num" id="stat-streak">0</div><div class="stat-label">连续打卡（天）</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-km">0.0</div><div class="stat-label">累计里程（公里）</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-stamps">0</div><div class="stat-label">累计印章（枚）</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-sessions">0</div><div class="stat-label">训练次数</div></div>
+    </div>
+
+    <div class="home-actions">
+      <button id="btn-passport" class="btn btn-ghost">📖 通关文牒</button>
+      <button id="btn-settings" class="btn btn-ghost">⚙️ 设置与数据</button>
+    </div>
+
+    <p class="home-tip" id="home-tip">建议穿着运动鞋，身前 2 米内留出活动空间。</p>
+  </section>
+
+  <!-- ============ 训练准备 ============ -->
+  <section id="screen-setup" class="screen hidden">
+    <h2>出发前的准备</h2>
+
+    <div class="setup-grid">
+      <div class="setup-col">
+        <div class="card">
+          <h3>① 安全确认</h3>
+          <label class="check-row">
+            <input type="checkbox" id="ck-safety">
+            <span>我今天身体状况适合运动。如出现<b>胸闷、胸痛、明显气短、头晕、心悸</b>，会立即停止。</span>
+          </label>
+        </div>
+
+        <div class="card">
+          <h3>② 我的情况</h3>
+          <div class="form-row">
+            <label>训练场景</label>
+            <label class="radio-pill"><input type="radio" name="setting" value="home" checked>居家康复</label>
+            <label class="radio-pill"><input type="radio" name="setting" value="clinic">院内监护（医护观察）</label>
+          </div>
+          <p class="hint" id="setting-hint">居家版：标准安全策略（心率超上限12秒自动暂停）。</p>
+          <div class="form-row">
+            <label>年龄</label>
+            <input type="number" id="in-age" min="30" max="90" value="55">
+            <label>静息心率</label>
+            <input type="number" id="in-resthr" min="40" max="110" value="70">
+            <span class="unit">次/分</span>
+          </div>
+          <label class="check-row">
+            <input type="checkbox" id="ck-beta">
+            <span>我服用<b>β受体阻滞剂</b>或装有<b>起搏器</b>（心率指标仅供参考，以疲劳感觉为主）</span>
+          </label>
+          <div class="form-row">
+            <label>姿势</label>
+            <label class="radio-pill"><input type="radio" name="mode" value="standing" checked>站姿</label>
+            <label class="radio-pill"><input type="radio" name="mode" value="seated">坐姿</label>
+          </div>
+          <div class="form-row">
+            <label>主运动时长</label>
+            <span id="mainsec-choices" class="choice-group"></span>
+          </div>
+          <div class="form-row">
+            <label>目标心率（自动计算）</label>
+            <b id="hr-zone-text">—</b>
+          </div>
+        </div>
+      </div>
+
+      <div class="setup-col">
+        <div class="card">
+          <h3>③ 摄像头 / 演示</h3>
+          <div id="cam-panel">
+            <video id="cam-video" playsinline muted></video>
+            <canvas id="cam-preview" width="320" height="240"></canvas>
+            <div id="cam-status" class="cam-status">未开启</div>
+            <div class="cam-btns">
+              <button id="btn-cam" class="btn btn-small">开启摄像头</button>
+            </div>
+            <p class="hint">提示：开启后请退后 2~3 米，让<b>全身</b>出现在画面中；看到骨架即识别成功。</p>
+          </div>
+          <label class="check-row demo-row">
+            <input type="checkbox" id="ck-demo">
+            <span><b>演示模式</b>：无需摄像头，用 ←→ 键踏步、鼠标当手（适合展示与调试）</span>
+          </label>
+          <label class="check-row demo-row" id="row-auto">
+            <input type="checkbox" id="ck-auto">
+            <span>自动行走（演示模式下自动踏步挥手，完全自动播放）</span>
+          </label>
+        </div>
+
+        <div class="card">
+          <h3>④ 心率带（可选）</h3>
+          <div class="form-row">
+            <button id="btn-hr" class="btn btn-small">连接蓝牙心率带</button>
+            <span id="hr-status">未连接</span>
+          </div>
+          <div class="form-row" id="hr-ws-row">
+            <label>研究设备（津发手环等）</label>
+            <input type="text" id="in-hr-ws" placeholder="ws://192.168.1.10:9000" style="flex:1;min-width:150px">
+            <button id="btn-hr-ws" class="btn btn-small">接入</button>
+          </div>
+          <div class="form-row" id="hr-manual-row">
+            <label>或手动输入脉搏</label>
+            <input type="number" id="in-hr-manual" placeholder="运动中随时可改" min="40" max="200">
+            <span class="unit">次/分</span>
+          </div>
+          <p class="hint">蓝牙兼容 Polar、迪卡侬、华为等标准心率带；研究手环可经采集软件以 WebSocket 转发（数据为 JSON，字段名 bpm / hr / heart_rate 均可识别）；不连接也可训练，安全控制以疲劳感觉为主。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-actions">
+      <button id="btn-back-home" class="btn btn-ghost">返回</button>
+      <button id="btn-begin" class="btn btn-primary btn-xl">出发！</button>
+    </div>
+  </section>
+
+  <!-- ============ 游戏 ============ -->
+  <section id="screen-game" class="screen screen-game hidden">
+    <div class="game-wrap">
+      <canvas id="game-canvas"></canvas>
+
+      <!-- HUD 顶栏 -->
+      <div class="hud hud-top">
+        <div class="hud-phase">
+          <span id="hud-phase-label">热身</span>
+          <div class="progress"><div id="hud-progress"></div></div>
+          <span id="hud-time">--:--</span>
+        </div>
+        <div class="hud-chips">
+          <span class="chip">🚶 <b id="hud-steps">0</b> 步</span>
+          <span class="chip">📍 <b id="hud-km">0.00</b> km</span>
+          <span class="chip">📮 <b id="hud-stamps">0</b>/<b id="hud-stamps-need">12</b></span>
+          <span class="chip" id="hud-hr-chip">❤️ <b id="hud-hr">--</b></span>
+        </div>
+        <div class="hud-btns">
+          <button id="btn-game-pause" class="btn-icon" title="暂停">⏸</button>
+          <button id="btn-game-stop" class="btn-icon btn-danger" title="结束">⏹</button>
+        </div>
+      </div>
+
+      <!-- 步频（左下，预览之上） -->
+      <div class="hud hud-cadence">
+        <span class="chip chip-cadence">步频 <b id="hud-cadence">0</b> / 目标 <b id="hud-tempo">92</b></span>
+      </div>
+
+      <!-- 摄像头预览（左下角） -->
+      <canvas id="game-cam-preview" width="220" height="165" class="cam-preview hidden"></canvas>
+
+      <!-- RPE 快捷按钮 -->
+      <button id="btn-rpe-quick" class="btn-rpe-quick">有点累？<br>告诉教练</button>
+
+      <!-- RPE 自评弹窗 -->
+      <div id="rpe-overlay" class="overlay hidden">
+        <div class="dialog">
+          <h3>现在感觉怎么样？</h3>
+          <p class="dialog-sub">目标：<b>有点累～稍累</b>（还能说话，但唱不了歌）</p>
+          <div class="rpe-btns">
+            <button class="rpe-btn" data-v="0"><span class="face">😊</span>很轻松<span class="rpe-val">0</span></button>
+            <button class="rpe-btn" data-v="1"><span class="face">😊</span>轻松<span class="rpe-val">1</span></button>
+            <button class="rpe-btn" data-v="2"><span class="face">🙂</span>还行<span class="rpe-val">2</span></button>
+            <button class="rpe-btn rpe-target" data-v="3"><span class="face">😌</span>有点累<span class="rpe-val">3</span></button>
+            <button class="rpe-btn rpe-target" data-v="4"><span class="face">😮‍💨</span>稍累<span class="rpe-val">4</span></button>
+            <button class="rpe-btn" data-v="5"><span class="face">😓</span>比较累<span class="rpe-val">5</span></button>
+            <button class="rpe-btn" data-v="6"><span class="face">😵</span>很累/难受<span class="rpe-val">6+</span></button>
+          </div>
+          <p class="hint">您的回答会自动调整游戏节奏，如实选择就好。</p>
+        </div>
+      </div>
+
+      <!-- 心率休息 -->
+      <div id="rest-overlay" class="overlay hidden">
+        <div class="dialog">
+          <h3>休息一下</h3>
+          <p class="dialog-sub" id="rest-reason">心率略高，跟着圆圈深呼吸，恢复后继续。</p>
+          <div class="breath-ball" id="rest-breath"></div>
+          <p class="hr-big">❤️ <b id="rest-hr">--</b> 次/分 <span id="rest-zone"></span></p>
+          <div class="dialog-btns">
+            <button id="btn-rest-resume" class="btn btn-primary">缓过来了，继续</button>
+            <button id="btn-rest-stop" class="btn btn-ghost">今天到此为止</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 手动暂停 -->
+      <div id="pause-overlay" class="overlay hidden">
+        <div class="dialog">
+          <h3>已暂停</h3>
+          <p class="dialog-sub">想继续时随时回来，山河不会走远。</p>
+          <div class="dialog-btns">
+            <button id="btn-pause-resume" class="btn btn-primary">继续</button>
+            <button id="btn-pause-stop" class="btn btn-ghost">结束训练</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 景点介绍卡 -->
+      <div id="scene-intro-overlay" class="overlay hidden">
+        <div class="dialog scene-intro">
+          <div class="scene-intro-img-wrap">
+            <img id="scene-intro-img" alt="景点实景">
+            <div class="scene-intro-badge" id="scene-intro-ch">湖</div>
+          </div>
+          <h3 id="scene-intro-name">杭州西湖</h3>
+          <p class="scene-intro-sub" id="scene-intro-sub">欲把西湖比西子，淡妆浓抹总相宜</p>
+          <p class="scene-intro-text" id="scene-intro-text"></p>
+          <div class="scene-intro-tips" id="scene-intro-tips"></div>
+          <div class="dialog-btns">
+            <button id="btn-scene-intro-ok" class="btn btn-primary">继续行走</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 景点速览（ℹ️ 点击）-->
+      <button id="btn-scene-info" class="btn-icon btn-scene-info" title="景点介绍">ℹ️</button>
+
+      <!-- 手机横屏引导 -->
+      <div id="rotate-overlay" class="overlay overlay-rotate hidden">
+        <div class="rotate-phone">📱<div class="rotate-arrow">⟳</div></div>
+        <p>请横过来使用<br><span class="hint-inline">横屏视野更好，也更容易拍到全身</span></p>
+      </div>
+
+      <!-- 演示模式触屏踏步 -->
+      <button id="btn-tap-step" class="btn-tap-step hidden">🚶 踏步</button>
+
+      <!-- 结束确认 -->
+      <div id="stop-overlay" class="overlay hidden">
+        <div class="dialog">
+          <h3>确定要结束吗？</h3>
+          <p class="dialog-sub">已完成的运动量会正常记录进通关文牒。</p>
+          <div class="dialog-btns">
+            <button id="btn-stop-confirm" class="btn btn-danger-solid">结束本次训练</button>
+            <button id="btn-stop-cancel" class="btn btn-ghost">再练一会儿</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 结算 ============ -->
+  <section id="screen-summary" class="screen hidden">
+    <h2 id="summary-title">今日旅程完成！</h2>
+    <p class="summary-sub" id="summary-sub">走的每一步，都算数。</p>
+
+    <div class="summary-grid">
+      <div class="card card-highlight">
+        <div class="stamp-new"><span id="summary-stamp-ch">湖</span></div>
+        <div class="stat-num big" id="sum-stamps">0</div>
+        <div class="stat-label">本次收入印章</div>
+      </div>
+      <div class="stat-cards stat-cards-sm">
+        <div class="stat-card"><div class="stat-num" id="sum-steps">0</div><div class="stat-label">步数</div></div>
+        <div class="stat-card"><div class="stat-num" id="sum-km">0</div><div class="stat-label">公里</div></div>
+        <div class="stat-card"><div class="stat-num" id="sum-min">0</div><div class="stat-label">分钟</div></div>
+        <div class="stat-card"><div class="stat-num" id="sum-kcal">0</div><div class="stat-label">估算千卡</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>运动强度回顾</h3>
+      <div id="summary-detail" class="summary-detail"></div>
+      <canvas id="hr-spark" width="640" height="120" class="hr-spark hidden"></canvas>
+    </div>
+
+    <div class="card" id="summary-badges-card">
+      <h3>徽章墙</h3>
+      <div id="summary-badges" class="badges"></div>
+    </div>
+
+    <div class="setup-actions">
+      <button id="btn-summary-home" class="btn btn-ghost">返回主页</button>
+      <button id="btn-summary-again" class="btn btn-primary">再来一段</button>
+    </div>
+  </section>
+
+  <!-- ============ 通关文牒 ============ -->
+  <section id="screen-passport" class="screen hidden">
+    <header class="passport-hero">
+      <div class="hero-stamp stamp-lg">牒</div>
+      <div>
+        <h2>通关文牒</h2>
+        <p class="subtitle" id="passport-sub">山河十二景 · 集章之旅</p>
+      </div>
+    </header>
+    <div class="journey-bar">
+      <div class="journey-progress"><div id="journey-fill"></div></div>
+      <span id="journey-text">0 / 96 枚</span>
+    </div>
+    <div id="passport-grid" class="passport-grid"></div>
+    <div class="setup-actions">
+      <button id="btn-passport-back" class="btn btn-ghost">返回</button>
+    </div>
+  </section>
+
+  <!-- ============ 设置与数据 ============ -->
+  <section id="screen-settings" class="screen hidden">
+    <h2>设置与数据</h2>
+
+    <div class="setup-grid">
+      <div class="setup-col">
+        <div class="card">
+          <h3>体验设置</h3>
+          <label class="check-row"><input type="checkbox" id="set-sound" checked><span>音效（节拍与提示音）</span></label>
+          <label class="check-row"><input type="checkbox" id="set-speech" checked><span>语音教练（中文语音提示）</span></label>
+        </div>
+        <div class="card">
+          <h3>训练数据</h3>
+          <div class="form-row">
+            <button id="btn-export-csv" class="btn btn-small">导出 CSV（汇总）</button>
+            <button id="btn-export-json" class="btn btn-small">导出 JSON（完整）</button>
+          </div>
+          <p class="hint">CSV 含每次训练的时长、步数、步频、印章、RPE、心率等汇总指标，可直接用 Excel / SPSS 分析。</p>
+          <div class="form-row">
+            <button id="btn-clear" class="btn btn-small btn-danger">清空全部本地数据</button>
+          </div>
+        </div>
+      </div>
+      <div class="setup-col">
+        <div class="card">
+          <h3>科研参数（高级）</h3>
+          <p class="hint">调整强度处方后自动保存，下次训练生效。</p>
+          <div class="form-row"><label>储备心率下限 %</label><input type="number" id="cfg-int-lo" min="20" max="70" step="1"></div>
+          <div class="form-row"><label>储备心率上限 %</label><input type="number" id="cfg-int-hi" min="30" max="80" step="1"></div>
+          <div class="form-row"><label>RPE 弹窗间隔（秒）</label><input type="number" id="cfg-rpe-int" min="120" max="600" step="30"></div>
+          <div class="form-row"><label>主运动起始步频</label><input type="number" id="cfg-tempo" min="80" max="120" step="2"></div>
+          <p class="hint" id="cfg-hint"></p>
+        </div>
+        <div class="card">
+          <h3>关于</h3>
+          <p class="hint">云游山河 v1.0 —— 冠心病 II/III 期（居家）心脏康复体感游戏原型。<br>
+          运动方案：中等强度有氧（踏步）+ 上肢关节活动（摘取），三段式课程结构。<br>
+          <b>本游戏为科研原型，不能替代医嘱；训练方案请遵康复医师指导。</b></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-actions">
+      <button id="btn-settings-back" class="btn btn-ghost">返回</button>
+    </div>
+  </section>
+
+  <footer class="app-footer">云游山河 · 心脏康复集章之旅 —— 科研原型，不能替代医嘱</footer>
+</div>
+
+<script>
+// 全局错误提示条（离线环境排错用）
+window.addEventListener('error', function (e) {
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#8e2f26;color:#fff;padding:8px 14px;z-index:99999;font-size:14px';
+  d.textContent = '程序出错：' + (e.message || e.error) + ' （可按 F12 查看详情）';
+  document.body.appendChild(d);
+});
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
