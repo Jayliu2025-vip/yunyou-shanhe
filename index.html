@@ -2,11 +2,26 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f6f1e7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>云游山河 · 心脏康复集章之旅</title>
+<link rel="icon" href="favicon.ico">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<!-- 背景装饰：远山 · 祥云 · 暖阳 -->
+<div class="bg-scene" aria-hidden="true">
+  <div class="bg-sun"></div>
+  <div class="bg-cloud c1"></div>
+  <div class="bg-cloud c2"></div>
+  <svg viewBox="0 0 1200 320" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 320 L0 200 Q120 110 260 170 Q380 220 520 140 Q660 70 800 150 Q940 220 1080 160 L1200 190 L1200 320 Z" fill="#dfe5d2" opacity=".55"/>
+    <path d="M0 320 L0 250 Q160 170 320 225 Q480 275 640 205 Q800 145 960 215 Q1100 265 1200 230 L1200 320 Z" fill="#c9d4bd" opacity=".6"/>
+    <path d="M0 320 L0 290 Q200 240 400 275 Q600 305 800 265 Q1000 230 1200 275 L1200 320 Z" fill="#b3c2a4" opacity=".55"/>
+  </svg>
+</div>
 <div id="app">
 
   <!-- ============ 主页 ============ -->
@@ -22,13 +37,13 @@
 
     <p class="home-intro">原地踏步，云游中国十二景；抬手摘印，集齐通关文牒。<br>每天一段，让康复像旅行一样有趣。</p>
 
-    <button id="btn-start" class="btn btn-primary btn-xl">🚶 开始今日旅程</button>
+    <button id="btn-start" class="btn btn-primary btn-xl btn-pulse">🚶 开始今日旅程</button>
 
     <div class="stat-cards">
-      <div class="stat-card"><div class="stat-num" id="stat-streak">0</div><div class="stat-label">连续打卡（天）</div></div>
-      <div class="stat-card"><div class="stat-num" id="stat-km">0.0</div><div class="stat-label">累计里程（公里）</div></div>
-      <div class="stat-card"><div class="stat-num" id="stat-stamps">0</div><div class="stat-label">累计印章（枚）</div></div>
-      <div class="stat-card"><div class="stat-num" id="stat-sessions">0</div><div class="stat-label">训练次数</div></div>
+      <div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-num" id="stat-streak">0</div><div class="stat-label">连续打卡（天）</div></div>
+      <div class="stat-card"><div class="stat-icon">🏞️</div><div class="stat-num" id="stat-km">0.0</div><div class="stat-label">累计里程（公里）</div></div>
+      <div class="stat-card"><div class="stat-icon">📮</div><div class="stat-num" id="stat-stamps">0</div><div class="stat-label">累计印章（枚）</div></div>
+      <div class="stat-card"><div class="stat-icon">🎖️</div><div class="stat-num" id="stat-sessions">0</div><div class="stat-label">训练次数</div></div>
     </div>
 
     <div class="home-actions">
@@ -156,6 +171,7 @@
           <span class="chip" id="hud-hr-chip">❤️ <b id="hud-hr">--</b></span>
         </div>
         <div class="hud-btns">
+          <button id="btn-game-sound" class="btn-icon" title="声音开关">🔊</button>
           <button id="btn-game-pause" class="btn-icon" title="暂停">⏸</button>
           <button id="btn-game-stop" class="btn-icon btn-danger" title="结束">⏹</button>
         </div>
@@ -271,10 +287,10 @@
         <div class="stat-label">本次收入印章</div>
       </div>
       <div class="stat-cards stat-cards-sm">
-        <div class="stat-card"><div class="stat-num" id="sum-steps">0</div><div class="stat-label">步数</div></div>
-        <div class="stat-card"><div class="stat-num" id="sum-km">0</div><div class="stat-label">公里</div></div>
-        <div class="stat-card"><div class="stat-num" id="sum-min">0</div><div class="stat-label">分钟</div></div>
-        <div class="stat-card"><div class="stat-num" id="sum-kcal">0</div><div class="stat-label">估算千卡</div></div>
+        <div class="stat-card"><div class="stat-icon">🚶</div><div class="stat-num" id="sum-steps">0</div><div class="stat-label">步数</div></div>
+        <div class="stat-card"><div class="stat-icon">🏞️</div><div class="stat-num" id="sum-km">0</div><div class="stat-label">公里</div></div>
+        <div class="stat-card"><div class="stat-icon">⏱️</div><div class="stat-num" id="sum-min">0</div><div class="stat-label">分钟</div></div>
+        <div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-num" id="sum-kcal">0</div><div class="stat-label">估算千卡</div></div>
       </div>
     </div>
 

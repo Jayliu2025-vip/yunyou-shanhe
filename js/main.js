@@ -219,10 +219,13 @@ async function startSession() {
   prevBadgeIds = store.badges().filter(b => b.got).map(b => b.id);
 
   showScreen('screen-game');
+  syncSoundBtn();
   body.setPointerTarget($('game-canvas'));
   $('game-cam-preview').classList.toggle('hidden', bodyMode !== 'camera');
-  // 演示模式 + 触屏设备 → 显示踏步按钮
-  $('btn-tap-step').classList.toggle('hidden', !(bodyMode === 'demo' && IS_MOBILE));
+  // 演示模式 + 触屏设备 → 显示踏步按钮（并上移步频条避免重叠）
+  const showTap = bodyMode === 'demo' && IS_MOBILE;
+  $('btn-tap-step').classList.toggle('hidden', !showTap);
+  document.querySelector('.game-wrap').classList.toggle('has-tap', showTap);
   rotateHint();
 
   game = new Game({
@@ -240,6 +243,8 @@ function onGameEvent(ev) {
   switch (ev.type) {
     case 'rpe':
       $('rpe-overlay').classList.remove('hidden');
+      audio.speak('现在感觉怎么样？请如实选择您的疲劳程度。', true);
+      audio.vibrate(30);
       break;
     case 'scene-intro':
       showSceneIntro(ev.scene, ev.auto);
@@ -345,12 +350,20 @@ function updateHud(h) {
 function handleSessionEnd(session, updatedJourney) {
   hideAllOverlays();
   $('btn-tap-step').classList.add('hidden');
+  document.querySelector('.game-wrap').classList.remove('has-tap');
   if (wakeLock) { try { wakeLock.release(); wakeLock = null; } catch (e) {} }
   store.addSession(session);
   store.saveJourney(updatedJourney);
   journey = updatedJourney;
 
   const done = session.endedBy === 'completed';
+  // 语音播报本次成绩（手机端不用看屏幕也知道结果）
+  if (done) {
+    audio.gong();
+    audio.speak(`本次训练完成！共走 ${session.steps} 步，收获 ${session.stampsEarned} 枚印章。今天很棒，明天见！`, true);
+  } else {
+    audio.speak('今天的部分已经记录下来了，好好休息，明天继续。', true);
+  }
   $('summary-title').textContent = done ? '今日旅程完成！' : '今日旅程已记录';
   const st = store.streakInfo();
   $('summary-sub').textContent = done
@@ -455,7 +468,7 @@ function renderPassport() {
     const cls = earned ? 'earned' : (current ? 'current' : 'locked');
     const stampInner = earned ? s.ch : (current ? `${j.stampsInScene}/${CONFIG.game.stampCardNeed}` : '🔒');
     const prog = current ? `<div class="scene-progress-text">集章进度 ${j.stampsInScene}/${CONFIG.game.stampCardNeed}</div>` : '';
-    return `<div class="scene-card ${cls}">
+    return `<div class="scene-card ${cls}" data-ch="${s.ch}">
       <div class="scene-name">${s.name}</div>
       <div class="scene-sub">${s.sub}</div>
       <div class="scene-stamp">${stampInner}</div>
@@ -501,6 +514,15 @@ function saveCfgFromInputs() {
   applyCfgOverrides();
   store.saveSettings(settings);
   updateCfgHint();
+}
+
+/* ---------------- 游戏内声音开关 ---------------- */
+
+function syncSoundBtn() {
+  const on = settings.sound || settings.speech;
+  $('btn-game-sound').textContent = on ? '🔊' : '🔇';
+  $('btn-game-sound').classList.toggle('muted', !on);
+  $('btn-game-sound').title = on ? '声音：开（点击静音）' : '声音：关（点击开启）';
 }
 
 /* ---------------- 工具 ---------------- */
@@ -560,6 +582,8 @@ function bind() {
   // 游戏按钮
   $('btn-game-pause').onclick = () => {
     if (!game) return;
+    audio.pauseCue();
+    audio.speak('已暂停，想继续时随时回来。');
     game.pause('manual');
     $('pause-overlay').classList.remove('hidden');
   };
@@ -568,12 +592,21 @@ function bind() {
     game.pause('manual-stop');
     $('stop-overlay').classList.remove('hidden');
   };
-  $('btn-pause-resume').onclick = () => { game && game.resume(); $('pause-overlay').classList.add('hidden'); };
+  $('btn-pause-resume').onclick = () => {
+    audio.resumeCue();
+    audio.speak('继续加油！');
+    game && game.resume();
+    $('pause-overlay').classList.add('hidden');
+  };
   $('btn-pause-stop').onclick = () => {
     $('pause-overlay').classList.add('hidden');
     game && game.stop('user');
   };
-  $('btn-stop-confirm').onclick = () => { $('stop-overlay').classList.add('hidden'); game && game.stop('user'); };
+  $('btn-stop-confirm').onclick = () => {
+    $('stop-overlay').classList.add('hidden');
+    audio.speak('好的，本次训练到此结束。');
+    game && game.stop('user');
+  };
   $('btn-stop-cancel').onclick = () => {
     $('stop-overlay').classList.add('hidden');
     $('pause-overlay').classList.remove('hidden');
@@ -592,6 +625,8 @@ function bind() {
   $('btn-rest-resume').onclick = () => {
     $('rest-overlay').classList.add('hidden');
     stopRestHrWatcher();
+    audio.resumeCue();
+    audio.speak('好的，我们继续，跟着脚印的节奏慢慢来。', true);
     game && game.resume();
   };
   $('btn-rest-stop').onclick = () => {
@@ -656,6 +691,22 @@ function bind() {
   // 演示模式触屏踏步（手机演示）
   $('btn-tap-step').onclick = () => { if (body) body.tapStep(); };
 
+  // 游戏内声音开关（音效 + 语音一体切换）
+  $('btn-game-sound').onclick = () => {
+    const on = !(settings.sound || settings.speech);
+    settings.sound = on;
+    settings.speech = on;
+    store.saveSettings(settings);
+    syncSoundBtn();
+    if (on) {
+      audio.ensure();
+      audio.resumeCue();
+      audio.speak('声音已开启。', true);
+    } else {
+      try { window.speechSynthesis.cancel(); } catch (e) { /* 忽略 */ }
+    }
+  };
+
   // 页面关闭时释放摄像头与屏幕常亮锁
   window.addEventListener('beforeunload', () => {
     if (body) body.stop();
@@ -667,4 +718,5 @@ function bind() {
 
 bind();
 renderHome();
+audio.bindUnlock();   // 手机端：首次触摸即解锁音效与语音
 if (QUICK) console.log('[云游山河] 快速体验模式：热身20s / 主运动90s / 整理20s');

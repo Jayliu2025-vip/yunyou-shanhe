@@ -1,0 +1,10 @@
+{
+  "name": "yunyou-shanhe",
+  "version": "1.0.0",
+  "private": true,
+  "description": "云游山河 · 心脏康复集章之旅（体感游戏原型）",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  }
+}
