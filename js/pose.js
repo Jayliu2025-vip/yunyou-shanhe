@@ -60,9 +60,14 @@ export class BodyInput {
       this._bindDemoInput();
       return;
     }
-    // 摄像头
+    // 摄像头（移动端降低采集分辨率，换取推理帧率）
+    const isMobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
     this.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      video: {
+        facingMode: 'user',
+        width: { ideal: isMobile ? 480 : 640 },
+        height: { ideal: isMobile ? 360 : 480 },
+      },
       audio: false,
     });
     this.video.srcObject = this.stream;
@@ -234,15 +239,18 @@ export class BodyInput {
     };
   }
 
-  /** 腿部踏步：踝-髋垂直距离 / 躯干长度，自适应站立基线 + 滞回 */
+  /** 腿部踏步：踝-髋垂直距离 / 躯干长度，自适应站立基线（按时间衰减，与帧率无关）+ 滞回 */
   _detectStepsLegs(torso, now) {
     const s = this.sm;
+    const dt = this._lastLegTs ? Math.min(0.25, (now - this._lastLegTs) / 1000) : 0.016;
+    this._lastLegTs = now;
     for (const side of ['l', 'r']) {
       const hip = s[side + 'Hip'], an = s[side + 'An'];
       const rel = (an.y - hip.y) / torso;
-      // 基线缓慢跟随站立位（踏步只会让 rel 变小，取偏大值更新）
+      // 基线跟随站立位：踏步只会让 rel 变小（取偏大值快速上抬），
+      // 缓慢下探 0.09/秒，避免久站后基线漂移导致漏检
       const B = this.baseRel[side];
-      this.baseRel[side] = rel > B ? rel * 0.1 + B * 0.9 : Math.max(1.2, B - 0.0015); // 缓慢下探
+      this.baseRel[side] = rel > B ? rel * 0.1 + B * 0.9 : Math.max(1.2, B - 0.09 * dt);
       const lift = this.baseRel[side] - 0.24;
       const plant = this.baseRel[side] - 0.09;
       const st = this.footState[side];

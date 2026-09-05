@@ -639,7 +639,7 @@ h3::before {
 /* ---------------- 横屏引导 / 触屏踏步 ---------------- */
 
 .overlay-rotate {
-  display: none; flex-direction: column; gap: 20px; text-align: center;
+  display: flex; flex-direction: column; gap: 20px; text-align: center;
   z-index: 40;                       /* 盖住其他弹窗，竖屏时全屏提示 */
   background: rgba(10, 16, 24, .92);
 }
@@ -731,9 +731,9 @@ h3::before {
   .hud-chips { display: none; }
 }
 
-/* 手机竖屏：更激进的精简 + 横屏引导 */
+/* 手机竖屏：横屏引导由 JS 控制显隐（.hidden 可靠隐藏），此处只调整层级 */
 @media (max-width: 760px) and (orientation: portrait) {
-  .overlay-rotate { display: flex !important; }
+  .overlay-rotate { z-index: 40; }
 }
 
 /* 减少动态效果偏好 */

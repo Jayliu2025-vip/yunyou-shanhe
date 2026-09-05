@@ -33,7 +33,9 @@ export class HRMonitor {
         optionalServices: ['battery_service'],
       });
       this._device.addEventListener('gattserverdisconnected', () => {
-        this.connected = false; this._status('disconnected');
+        this.connected = false;
+        this.bpm = null;          // 清空残留值，避免旧心率继续驱动显示与自动暂停
+        this._status('disconnected');
       });
       this._server = await this._device.gatt.connect();
       const svc = await this._server.getPrimaryService('heart_rate');
@@ -107,8 +109,8 @@ export class HRMonitor {
         }
       } catch (e) { /* 非 JSON 忽略 */ }
     };
-    ws.onclose = () => { this.connected = false; this._status('disconnected'); };
-    ws.onerror = () => { this.connected = false; this._status('disconnected'); };
+    ws.onclose = () => { this.connected = false; this.bpm = null; this._status('disconnected'); };
+    ws.onerror = () => { this.connected = false; this.bpm = null; this._status('disconnected'); };
     return true;
   }
 

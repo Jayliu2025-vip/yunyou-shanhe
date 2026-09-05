@@ -191,6 +191,8 @@ export class Game {
 
     const bodyState = this.body.update(now);
     this.bodyState = bodyState;
+    // 摄像头模式：左下角预览实时绘制（drawPreview 内部自判 demo/空指针）
+    this.body.drawPreview();
 
     if (!this.paused) this._update(dt, bodyState, now);
     this._render(now);
@@ -347,15 +349,24 @@ export class Game {
   _updateHr(dt) {
     const bpm = this.hr.bpm;
     if (!bpm || this.hr.manual || !this.hrZone) return;
+    // β受体阻滞剂/起搏器：心率法失真 → 不做自动暂停，仅记录事件（HUD 仍会变色提示）
+    const beta = !!this.profile.betaBlocker;
     if (bpm > this.hrZone.high) {
       this.hrOverSec += dt;
+      if (beta) {
+        if (this.hrOverSec >= (this.hrOverLimitSec ?? CONFIG.medical.hrOverLimitPauseSec)) {
+          this.hrOverSec = 0;
+          this.events.push({ t: Math.round(this.simTime), type: 'beta-hr-high', bpm });
+        }
+        return;
+      }
       if (this.hrOverSec >= this.hrOverLimitSec && !this.paused) {
         this.hrOverSec = 0;
         this.autoPauses++;
         this.pause('hr-high');
         this.audio.warn();
         this.audio.speak('心率偏高，我们先休息一会儿，跟着圆圈深呼吸。', true);
-        this.onEvent({ type: 'hr-pause', bpm });
+        this.onEvent({ type: 'hr-pause', bpm, suggestEnd: this.autoPauses >= 3 });
       }
     } else {
       this.hrOverSec = Math.max(0, this.hrOverSec - dt * 2);
@@ -499,6 +510,15 @@ export class Game {
     this.rpeSamples.push({ t: Math.round(this.simTime), v });
     this.events.push({ t: Math.round(this.simTime), type: 'rpe', v });
     const { rpeTargetLow, rpeTargetHigh } = CONFIG.medical;
+    if (v >= 6) {
+      // 明显疲劳/不适：保守处置——直接进休息界面，缓过来后由患者决定继续或结束
+      this.tempo = Math.max(T.min, this.tempo + T.rpeHighAdjust);
+      this.pause('rpe-hard');
+      this.audio.warn();
+      this.audio.speak('很累时我们应当休息。跟着圆圈深呼吸，缓过来后可以继续，也可以今天到此为止。', true);
+      this.onEvent({ type: 'hr-pause', bpm: null, reason: 'rpe', suggestEnd: true });
+      return;
+    }
     if (v >= 5) {
       this.tempo = Math.max(T.min, this.tempo + T.rpeHighAdjust);
       this.audio.speak('明白，我们把节奏放慢一些，舒服最重要。');

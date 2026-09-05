@@ -217,6 +217,7 @@ async function startSession() {
   stopSetupPreview();
   journey = store.getJourney();
   prevBadgeIds = store.badges().filter(b => b.got).map(b => b.id);
+  rotateDismissed = false;   // 新一局重新给一次横屏建议
 
   showScreen('screen-game');
   syncSoundBtn();
@@ -249,12 +250,18 @@ function onGameEvent(ev) {
     case 'scene-intro':
       showSceneIntro(ev.scene, ev.auto);
       break;
-    case 'hr-pause':
-      $('rest-reason').textContent =
-        `心率 ${ev.bpm} 次/分，略高于目标上限。跟着圆圈深呼吸，恢复后继续。`;
+    case 'hr-pause': {
+      const reason = ev.reason === 'rpe'
+        ? '您反馈了明显疲劳，先休息一下——缓过来再决定继续或结束。'
+        : `心率 ${ev.bpm} 次/分，略高于目标上限。跟着圆圈深呼吸，恢复后继续。`;
+      const endTip = ev.reason === 'rpe'
+        ? '（如仍有不适，建议今天到此为止）'
+        : (ev.suggestEnd ? '（今天已多次需要休息，如仍有不适建议结束训练）' : '');
+      $('rest-reason').textContent = reason + endTip;
       $('rest-overlay').classList.remove('hidden');
       startRestHrWatcher();
       break;
+    }
     case 'end':
       handleSessionEnd(ev.session, ev.journey);
       break;
@@ -298,11 +305,13 @@ function hideAllOverlays() {
   stopRestHrWatcher();
 }
 
-/* 手机竖屏时在游戏页显示横屏引导 */
+/* 手机竖屏时在游戏页显示横屏引导（患者可选择竖屏继续，选择后本次不再打扰） */
+let rotateDismissed = false;
 function rotateHint() {
   const inGame = !$('screen-game').classList.contains('hidden');
   const portrait = window.innerHeight > window.innerWidth;
-  $('rotate-overlay').classList.toggle('hidden', !(inGame && portrait && IS_MOBILE));
+  const show = inGame && portrait && IS_MOBILE && !rotateDismissed;
+  $('rotate-overlay').classList.toggle('hidden', !show);
 }
 window.addEventListener('resize', rotateHint);
 
@@ -573,7 +582,6 @@ function bind() {
     const ok = await hr.connect();
     $('hr-status').textContent = ok ? `已连接 ${hr.deviceName} ✓` : '未连接';
   };
-  hr.onUpdate = (bpm) => { if (game && game.running) { /* HUD 自动刷新 */ } };
   $('in-hr-manual').onchange = () => {
     const v = parseInt($('in-hr-manual').value, 10);
     if (v > 0) { hr.setManual(v); $('hr-status').textContent = `手动心率：${hr.bpm} 次/分`; }
@@ -648,8 +656,8 @@ function bind() {
 
   // 设置
   $('btn-settings-back').onclick = () => { renderHome(); showScreen('screen-home'); };
-  $('set-sound').onchange = () => { settings.sound = $('set-sound').checked; store.saveSettings(settings); };
-  $('set-speech').onchange = () => { settings.speech = $('set-speech').checked; store.saveSettings(settings); };
+  $('set-sound').onchange = () => { settings.sound = $('set-sound').checked; store.saveSettings(settings); syncSoundBtn(); };
+  $('set-speech').onchange = () => { settings.speech = $('set-speech').checked; store.saveSettings(settings); syncSoundBtn(); };
   ['cfg-int-lo', 'cfg-int-hi', 'cfg-rpe-int', 'cfg-tempo'].forEach(id => {
     $(id).onchange = saveCfgFromInputs;
   });
@@ -690,6 +698,12 @@ function bind() {
 
   // 演示模式触屏踏步（手机演示）
   $('btn-tap-step').onclick = () => { if (body) body.tapStep(); };
+
+  // 竖屏引导"就按竖屏继续"：本次训练内不再弹出
+  $('btn-rotate-continue').onclick = () => {
+    rotateDismissed = true;
+    $('rotate-overlay').classList.add('hidden');
+  };
 
   // 游戏内声音开关（音效 + 语音一体切换）
   $('btn-game-sound').onclick = () => {
