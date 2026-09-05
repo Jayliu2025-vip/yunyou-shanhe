@@ -741,3 +741,18 @@ h3::before {
   .hero-stamp, .bg-cloud, .btn-pulse::after, .breath-ball { animation: none !important; }
   .screen { animation: none; }
 }
+
+/* 微信内打开引导 */
+.wechat-icon { font-size: 2.8rem; text-align: center; margin-bottom: 4px; }
+
+/* 结算页今日称号 */
+.title-award {
+  font-family: "STKaiti","KaiTi","SimSun",serif;
+  color: #c9971e;
+  font-size: 1.05rem;
+  letter-spacing: 2px;
+  margin: 2px 0 0;
+}
+
+/* 设置页教练声音下拉 */
+select { padding: 8px 10px; border: 1.5px solid #d8cdb4; border-radius: 10px; background: #fffdf6; font-size: 15px; color: #2b3a4a; }

@@ -1,0 +1,7 @@
+<web-view wx:if="{{configured}}" src="{{url}}" bindmessage="onMessage"></web-view>
+
+<view wx:else class="setup-tip">
+  <view class="tip-icon">🗺️</view>
+  <text class="tip-title">尚未配置游戏地址</text>
+  <text class="tip-body">请在 pages/index/index.js 中把 H5_URL 替换为已部署（HTTPS 备案域名）并加入小程序「业务域名」的游戏地址。接入步骤见仓库 README 第七节。</text>
+</view>

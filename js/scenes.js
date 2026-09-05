@@ -401,7 +401,9 @@ export const SCENES = [
   },
 ];
 
-/** 整理放松阶段的康复小知识（每 20 秒轮换一条） */
+/** 整理放松阶段的康复小知识（每 20 秒轮换一条）
+ *  覆盖 2026 ESC 心脏康复指南核心组件：运动之外，用药依从、戒烟、心理、
+ *  营养与减少久坐同样是康复的一部分。 */
 export const HEALTH_TIPS = [
   '运动后不要立刻坐下或洗热水澡，先慢走几分钟，让心率平稳回落。',
   '运动后补水要小口多次，不要一次猛灌。',
@@ -411,18 +413,34 @@ export const HEALTH_TIPS = [
   '运动前后各做 5 分钟热身和整理，能显著降低心血管风险。',
   '服用β受体阻滞剂时，请以疲劳感觉（RPE）为准，不要只看心率。',
   '有氧运动加坐站练习，康复效果会更好。',
+  '按医嘱按时服药和他汀类药物，是心脏康复的基石，别自行停药。',
+  '戒烟一年，冠心病风险可下降约一半——任何时候戒烟都不晚。',
+  '心情低落、睡不好也是心脏康复要管的事，和家人多聊聊，必要时求助医生。',
+  '坐的时间长了，每小时起来走两三分钟，对血管就是很好的照顾。',
+  '饮食少油少盐，蔬果和全谷物多一些，地中海式饮食对心脏很友好。',
 ];
 
-/* ---------------- 实景照片 ---------------- */
+/* ---------------- 实景照片（按需加载，手机流量/首屏优化） ---------------- */
 
-/** 预加载全部景点照片（加载失败自动回退程序化场景） */
-export function loadScenePhotos() {
-  SCENES.forEach(s => {
-    const img = new Image();
-    img.onload = () => { s._photoImg = img; };
-    img.onerror = () => { console.warn('[云游山河] 景点照片加载失败，使用程序化场景：', s.photo); };
-    img.src = s.photo;
-  });
+const photoState = new Map(); // scene.id -> 'loading' | 'ok' | 'fail'（防重复请求）
+
+/** 按需加载单个景点照片（游戏"远眺巡游"与预取共用）；成功前 drawWorld 自动回退程序化水墨场景 */
+export function ensureScenePhoto(scene) {
+  if (!scene || scene._photoImg || photoState.get(scene.id)) return;
+  photoState.set(scene.id, 'loading');
+  const img = new Image();
+  img.onload = () => { scene._photoImg = img; photoState.set(scene.id, 'ok'); };
+  img.onerror = () => {
+    photoState.set(scene.id, 'fail');
+    console.warn('[云游山河] 景点照片加载失败，使用程序化场景：', scene.photo);
+  };
+  img.src = scene.photo;
+}
+
+/** 预加载当前站与下一站：首屏只拉 2 张（约 300~400KB），而非全量 12 张（约 2.3MB） */
+export function preloadScenePhotosAround(index) {
+  ensureScenePhoto(SCENES[((index % SCENES.length) + SCENES.length) % SCENES.length]);
+  ensureScenePhoto(SCENES[(index + 1) % SCENES.length]);
 }
 
 /** 实景照片世界：Ken Burns 缓动 + 轻雾 + 地面道路 */

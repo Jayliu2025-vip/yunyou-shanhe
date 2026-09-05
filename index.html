@@ -126,7 +126,7 @@
         </div>
 
         <div class="card">
-          <h3>④ 心率带（可选）</h3>
+          <h3>④ 心率监测（可选）</h3>
           <div class="form-row">
             <button id="btn-hr" class="btn btn-small">连接蓝牙心率带</button>
             <span id="hr-status">未连接</span>
@@ -141,7 +141,8 @@
             <input type="number" id="in-hr-manual" placeholder="运动中随时可改" min="40" max="200">
             <span class="unit">次/分</span>
           </div>
-          <p class="hint">蓝牙兼容 Polar、迪卡侬、华为等标准心率带；研究手环可经采集软件以 WebSocket 转发（数据为 JSON，字段名 bpm / hr / heart_rate 均可识别）；不连接也可训练，安全控制以疲劳感觉为主。</p>
+          <p class="hint" id="monitor-hint">当前：未连接心率设备。</p>
+          <p class="hint">蓝牙兼容 Polar、迪卡侬、华为等标准心率带；研究手环可经采集软件以 WebSocket 转发（数据为 JSON，字段名 bpm / hr / heart_rate 均可识别）。<b>不连接设备也可以安全训练</b>：居家康复为国际指南认可的方式（2026 ESC 心脏康复指南），届时游戏将以疲劳自评 + 说话测试 + 症状监护强度。</p>
         </div>
       </div>
     </div>
@@ -202,6 +203,7 @@
             <button class="rpe-btn" data-v="5"><span class="face">😓</span>比较累<span class="rpe-val">5</span></button>
             <button class="rpe-btn" data-v="6"><span class="face">😵</span>很累/难受<span class="rpe-val">6+</span></button>
           </div>
+          <p class="hint talk-test hidden" id="rpe-talktest">🗣️ 说话测试：能连贯说话但唱不了歌 = 强度合适；喘得说不出整句，请放慢或休息。</p>
           <p class="hint">您的回答会自动调整游戏节奏，如实选择就好。</p>
         </div>
       </div>
@@ -280,6 +282,7 @@
   <section id="screen-summary" class="screen hidden">
     <h2 id="summary-title">今日旅程完成！</h2>
     <p class="summary-sub" id="summary-sub">走的每一步，都算数。</p>
+    <p class="title-award" id="sum-award"></p>
 
     <div class="summary-grid">
       <div class="card card-highlight">
@@ -341,6 +344,16 @@
           <h3>体验设置</h3>
           <label class="check-row"><input type="checkbox" id="set-sound" checked><span>音效（节拍与提示音）</span></label>
           <label class="check-row"><input type="checkbox" id="set-speech" checked><span>语音教练（中文语音提示）</span></label>
+          <div class="form-row">
+            <label>教练声音</label>
+            <select id="set-voice" style="flex:1;min-width:150px"></select>
+            <button id="btn-voice-test" class="btn btn-small">试听</button>
+          </div>
+          <div class="form-row">
+            <label>音效试听</label>
+            <button id="btn-sfx-test" class="btn btn-small">🔊 点我听新音效</button>
+          </div>
+          <p class="hint">男患者可换男声教练、女患者可换女声教练（取决于设备已安装的中文语音；Windows 自带"辉辉"女声与"康康"男声）。新音效（泡泡摘取、连击变调、里程碑、末印预告）也会在游戏进行中自动播放。</p>
         </div>
         <div class="card">
           <h3>训练数据</h3>
@@ -366,8 +379,8 @@
         </div>
         <div class="card">
           <h3>关于</h3>
-          <p class="hint">云游山河 v1.0 —— 冠心病 II/III 期（居家）心脏康复体感游戏原型。<br>
-          运动方案：中等强度有氧（踏步）+ 上肢关节活动（摘取），三段式课程结构。<br>
+          <p class="hint">云游山河 v1.2 —— 冠心病 II/III 期（居家）心脏康复体感游戏原型。<br>
+          运动方案：中等强度有氧（踏步）+ 上肢关节活动（摘取），三段式课程结构；安全策略参照 2026 ESC 心脏康复指南与《中国心血管疾病患者居家康复专家共识》。<br>
           <b>本游戏为科研原型，不能替代医嘱；训练方案请遵康复医师指导。</b></p>
         </div>
       </div>
@@ -377,6 +390,18 @@
       <button id="btn-settings-back" class="btn btn-ghost">返回</button>
     </div>
   </section>
+
+  <!-- 微信内打开引导（微信浏览器无法授权摄像头；演示模式可先体验） -->
+  <div id="wechat-overlay" class="overlay hidden">
+    <div class="dialog">
+      <div class="wechat-icon">💬</div>
+      <h3>微信内暂不能使用摄像头</h3>
+      <p class="dialog-sub">请点击右上角 <b>「···」</b> → <b>「在浏览器中打开」</b>，<br>即可正常使用摄像头进行体感训练。</p>
+      <div class="dialog-btns">
+        <button id="btn-wechat-demo" class="btn btn-primary">先体验（演示模式，无需摄像头）</button>
+      </div>
+    </div>
+  </div>
 
   <footer class="app-footer">云游山河 · 心脏康复集章之旅 —— 科研原型，不能替代医嘱</footer>
 </div>
