@@ -106,7 +106,7 @@ js/audio.js           WebAudio 合成音效 + 中文语音教练（零素材依�
 js/hr.js              心率接入三通道：Web Bluetooth（0x180D）/ WebSocket 研究设备 / 手动输入
 js/storage.js         localStorage 记录、打卡/徽章、CSV/JSON 导出
 assets/photos/        12 景实景照片（约1.6MB，q7 压缩、SSIM≥0.98；来源与许可见 CREDITS.md）
-vendor/               MediaPipe 模型与 WASM（本地化，**完全离线运行，无需外网**）
+vendor/               MediaPipe 模型与 WASM（本地化，**完全离线运行，无需外网**；Apache 2.0，见 vendor/CREDITS.md 与 vendor/LICENSE）
 miniprogram/          微信小程序 web-view 壳（可直接导入微信开发者工具，见下节）
 ```
 
@@ -151,3 +151,18 @@ miniprogram/          微信小程序 web-view 壳（可直接导入微信开发
 - 无憋气发力设计：摘取动作为匀速抬臂，无 Valsalva 诱因；坐姿模式全程可坐；
 - RPE 超标自动降频（-8 步/分），RPE ≥6 保守处置直接休息，避免"游戏激励"导致的强度过冲；
 - β受体阻滞剂用户：心率自动暂停关闭（防药物性心率钝化导致误判），改以 RPE 与症状为主。
+
+## 九、素材与第三方组件版权（合规说明）
+
+- **照片**（assets/photos/）：12 景全部来自 Unsplash / Pixabay / Pexels 的免费商用许可
+  （Unsplash License / Pixabay Content License / Pexels License，均无需署名），
+  逐图来源清单见 `assets/photos/CREDITS.md`；
+- **音效**（assets/audio/）：Kenney「Interface Sounds」，**CC0**（公有领域），
+  见 `assets/audio/CREDITS.md`；其余音效与全部语音为 WebAudio 程序合成，无第三方素材；
+- **姿态识别**（vendor/）：Google MediaPipe Tasks Vision（vision_bundle.mjs、WASM 运行时）
+  与 Pose Landmarker lite 模型，**Apache License 2.0**——原样分发、未做修改，
+  已随仓库附完整许可文本（`vendor/LICENSE`）与来源清单（`vendor/CREDITS.md`）；
+- **其余全部原创**：代码、界面、水墨程序化背景、印章 favicon、景点文案与康复小知识均为本项目原创；
+- **医学指南/文献**（README §八）：仅作观点引用与出处标注，未复制原文表述；
+- 项目本体为科研原型，未附加开源许可证（默认保留所有权利）；如需对外发布或他人使用，
+  请先确定并添加 LICENSE 文件。

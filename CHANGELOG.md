@@ -1,5 +1,18 @@
 # 更新日志
 
+## v1.2.1（2026-09-06）
+
+版权合规整改：全项目素材与第三方组件许可复核，消除来源不明素材。
+
+- **替换 4 张来源不明照片**（原标注"待确认"）：西湖（原百度百科镜像）、洱海（原凤凰网）、
+  泰山日出（原 Trip.com）、布达拉宫（原 Wendy Wu Tours）→ 全部换为 Unsplash / Pixabay
+  明确免费商用许可图（尺寸规格不变：16:9、宽 1600px/1280px，直接覆盖同名文件，无需改代码）；
+  至此 12 景照片 **100% 来自 Unsplash License / Pixabay Content License / Pexels License**
+- **补充 MediaPipe（Apache 2.0）合规分发文件**：新增 `vendor/LICENSE`（Apache 2.0 全文）
+  与 `vendor/CREDITS.md`（组件来源清单，满足 Apache 2.0 保留许可副本要求）
+- assets/photos/CREDITS.md 更新为新来源清单；README 新增"§九 素材与第三方组件版权"
+- 音效（Kenney, CC0）、代码、水墨程序化背景、印章 favicon 均无第三方版权问题（复核确认）
+
 ## v1.2.0（2026-09-05）
 
 安全模式升级：**无心率设备也可安全训练**（RPE 主控），医学依据更新至 2026 版权威指南；
