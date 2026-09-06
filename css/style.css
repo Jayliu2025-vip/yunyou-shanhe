@@ -50,6 +50,20 @@ html {
 /* 键盘/遥控焦点可见（桌面演示模式与无障碍） */
 :focus-visible { outline: 3px solid rgba(224, 179, 60, .8); outline-offset: 2px; border-radius: 4px; }
 
+/* ---------------- 开源线性图标（Lucide，ISC License，内联 sprite） ----------------
+   stroke 跟随 currentColor：图标自动融入墨/朱砂/描金/石绿的色彩语境 */
+svg.icon {
+  width: 1.2em; height: 1.2em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -0.24em;   /* 与中文正文基线对齐 */
+  overflow: visible;         /* 描边端点不裁切 */
+  flex: none;
+}
+
 body {
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
   /* 宣纸质感：暖色光晕 + 极淡纤维纹（repeating gradient，静态一次绘制无性能开销） */
@@ -166,6 +180,7 @@ h3::before {
 
 .btn {
   font-family: inherit;
+  display: inline-flex; align-items: center; justify-content: center; gap: .45em;
   border: none; border-radius: 999px;
   padding: 13px 34px;
   font-size: 1.1rem; font-weight: 600;
@@ -269,10 +284,12 @@ h3::before {
 .stat-icon {
   display: inline-flex; align-items: center; justify-content: center;
   width: 42px; height: 42px; margin-bottom: 6px;
-  font-size: 1.25rem; border-radius: 50%;
+  border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fff8e6, #f3e3bd);
   box-shadow: inset 0 0 0 1px rgba(201, 151, 30, .3), 0 2px 5px rgba(43, 58, 74, .08);
+  color: var(--ink);
 }
+.stat-icon .icon { width: 22px; height: 22px; stroke-width: 1.9; }
 .stat-num { font-size: 1.9rem; font-weight: 700; color: var(--seal); font-variant-numeric: tabular-nums; line-height: 1.2; }
 .stat-num.big { font-size: 2.6rem; }
 .stat-label { color: var(--ink-soft); font-size: .92rem; margin-top: 4px; }
@@ -319,6 +336,8 @@ h3::before {
   transition: border-color .15s, box-shadow .15s;
 }
 .form-row input[type="number"] { width: 90px; }
+/* 手动脉搏输入：placeholder"如 105"需容纳数字步进按钮区，90px 会被裁尾字 */
+#in-hr-manual { width: 130px; }
 .form-row input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201, 151, 30, .18); }
 .unit { color: var(--ink-soft); font-size: .9rem; }
 
@@ -462,11 +481,14 @@ h3::before {
   border: 1px solid rgba(255, 255, 255, .18);
   background: rgba(10, 16, 24, .55);
   color: #fff; font-size: 1.25rem; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   transition: background .15s, transform .12s;
   touch-action: manipulation;
 }
+.btn-icon .icon { width: 22px; height: 22px; stroke-width: 1.9; }
+.btn-icon.btn-danger .icon { fill: currentColor; }   /* 结束键：实心方块警示 */
 .btn-icon:hover { background: rgba(10, 16, 24, .8); }
 .btn-icon:active { transform: scale(.92); }
 .btn-icon.muted { opacity: .45; filter: grayscale(1); }
@@ -560,7 +582,9 @@ h3::before {
 }
 .rpe-btn:hover { transform: translateY(-3px); border-color: var(--gold); box-shadow: 0 6px 14px rgba(201, 151, 30, .25); }
 .rpe-btn:active { transform: scale(.95); }
-.rpe-btn .face { font-size: 1.7rem; }
+.rpe-btn .face { display: inline-flex; color: var(--ink); }
+.rpe-btn .face .icon { width: 34px; height: 34px; stroke-width: 1.7; }
+.rpe-btn:nth-child(6) .face, .rpe-btn:nth-child(7) .face { color: var(--seal); }  /* 高强度两档：朱砂警示色 */
 .rpe-btn .rpe-val { font-size: .8rem; color: var(--ink-soft); }
 .rpe-btn.rpe-target {
   border-color: var(--jade);
@@ -619,7 +643,15 @@ h3::before {
   padding: 8px 16px;
 }
 .badge.locked { filter: grayscale(1); opacity: .45; border-color: rgba(43, 58, 74, .2); background: none; }
-.badge .icon { font-size: 1.6rem; }
+.badge .badge-ico {
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff8e6, #f3e3bd);
+  box-shadow: inset 0 0 0 1px rgba(201, 151, 30, .3);
+  color: var(--ink); flex: none;
+}
+.badge .badge-ico .icon { width: 22px; height: 22px; stroke-width: 1.9; }
+.badge.locked .badge-ico { background: none; box-shadow: inset 0 0 0 1px rgba(43, 58, 74, .22); }
 .badge .name { font-weight: 600; }
 .badge .desc { font-size: .85rem; color: var(--ink-soft); }
 
@@ -710,6 +742,7 @@ h3::before {
 }
 .scene-progress-text { font-size: .85rem; color: var(--ink-soft); margin-top: 8px; }
 .scene-card.locked { opacity: .55; }
+.scene-card.locked .scene-stamp .icon { width: 26px; height: 26px; stroke-width: 1.8; }
 
 /* ---------------- 景点介绍 ---------------- */
 
@@ -751,12 +784,14 @@ h3::before {
 }
 .overlay-rotate p { color: #fff; font-size: 1.3rem; line-height: 1.8; }
 .hint-inline { font-size: .95rem; color: rgba(255, 255, 255, .75); }
-.rotate-phone { font-size: 4rem; position: relative; }
+.rotate-phone { position: relative; width: fit-content; margin: 0 auto; color: #fff; }
+.rotate-phone .icon { width: 72px; height: 72px; stroke-width: 1.6; }
 .rotate-arrow {
-  position: absolute; right: -34px; top: 4px;
-  font-size: 1.8rem; color: var(--gold-soft);
+  position: absolute; right: -38px; top: 2px;
+  color: var(--gold-soft);
   animation: rotateHint 1.6s ease infinite;
 }
+.rotate-arrow .icon { width: 34px; height: 34px; stroke-width: 1.8; }
 @keyframes rotateHint { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(90deg); } }
 
 .btn-tap-step {
@@ -767,6 +802,7 @@ h3::before {
   background: rgba(10, 16, 24, .58);
   color: #ffe9a8; font-size: 1.05rem;
   font-family: inherit;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   box-shadow: 0 6px 18px rgba(0, 0, 0, .4);
@@ -774,6 +810,7 @@ h3::before {
   user-select: none;
   -webkit-user-select: none;
 }
+.btn-tap-step .icon { width: 28px; height: 28px; stroke-width: 1.8; }
 .btn-tap-step:active { transform: scale(.9); background: rgba(176, 58, 46, .75); }
 
 /* ---------------- 手机适配 ---------------- */
@@ -790,7 +827,8 @@ h3::before {
   .bg-sun { width: 64px; height: 64px; top: 4vh; right: 6vw; }
   .stat-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .stat-num { font-size: 1.6rem; }
-  .stat-icon { width: 36px; height: 36px; font-size: 1.1rem; margin-bottom: 4px; }
+  .stat-icon { width: 36px; height: 36px; margin-bottom: 4px; }
+  .stat-icon .icon { width: 19px; height: 19px; }
   .setup-grid { grid-template-columns: 1fr; }
   .card { padding: 16px 16px; }
   .form-row input[type="number"] { width: 74px; }
@@ -809,6 +847,7 @@ h3::before {
   #hud-time { font-size: .95rem; }
   .chip { font-size: .85rem; padding: 5px 10px; }
   .btn-icon { width: 52px; height: 52px; border-radius: 14px; font-size: 1.35rem; }
+  .btn-icon .icon { width: 26px; height: 26px; }
   .hud-cadence { bottom: calc(152px + var(--safe-bottom)); left: calc(10px + var(--safe-left)); }
   .cam-preview { width: 128px; height: 96px; }
   .btn-scene-info { top: calc(64px + var(--safe-top)); right: calc(10px + var(--safe-right)); width: 44px; height: 44px; }
@@ -851,7 +890,15 @@ h3::before {
 }
 
 /* 微信内打开引导 */
-.wechat-icon { font-size: 2.8rem; text-align: center; margin-bottom: 4px; }
+.wechat-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 64px; height: 64px; margin: 0 auto 10px;
+  border-radius: 50%;
+  background: linear-gradient(150deg, var(--seal-bright), var(--seal-deep));
+  color: #fff;
+  box-shadow: 0 5px 14px rgba(176, 58, 46, .4), inset 0 1px 0 rgba(255, 255, 255, .3);
+}
+.wechat-icon .icon { width: 34px; height: 34px; }
 
 /* 结算页今日称号 */
 .title-award {
@@ -860,7 +907,9 @@ h3::before {
   font-size: 1.05rem;
   letter-spacing: 2px;
   margin: 2px 0 0;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
 }
+.title-award .icon { width: 1.25em; height: 1.25em; stroke-width: 1.9; }
 
 /* 设置页教练声音下拉 */
 select { padding: 8px 10px; border: 1.5px solid #d8cdb4; border-radius: 10px; background: #fffdf6; font-size: 15px; color: #2b3a4a; }

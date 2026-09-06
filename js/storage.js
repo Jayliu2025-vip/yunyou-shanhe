@@ -177,16 +177,17 @@ export function badges() {
   const st = streakInfo();
   const totalReps = getSessions().reduce((a, s) => a + (s.sitStandReps || 0), 0);
   const list = [
-    { id: 'first', icon: '🏮', name: '迈出第一步', desc: '完成第一次训练', got: j.stampsTotal > 0 || st.totalSessions > 0 },
-    { id: 'd3', icon: '🌱', name: '三日之约', desc: '连续打卡 3 天', got: st.best >= 3 },
-    { id: 'd7', icon: '🎋', name: '七日同行', desc: '连续打卡 7 天', got: st.best >= 7 },
-    { id: 'd21', icon: '🌳', name: '廿一日养成', desc: '连续打卡 21 天', got: st.best >= 21 },
-    { id: 'd30', icon: '🏔️', name: '月度坚持', desc: '连续打卡 30 天', got: st.best >= 30 },
-    { id: 'km10', icon: '🧭', name: '十里春风', desc: '累计行走 10 公里', got: j.totalKm >= 10 },
-    { id: 'km50', icon: '🐎', name: '日行千里', desc: '累计行走 50 公里', got: j.totalKm >= 50 },
-    { id: 's30', icon: '📖', name: '文牒渐满', desc: '累计集章 30 枚', got: j.stampsTotal >= 30 },
-    { id: 's144', icon: '🎖️', name: '环游山河', desc: '集齐十三景 156 枚印章（环游一圈）', got: j.rounds >= 1 },
-    { id: 'reps30', icon: '🪑', name: '起坐达人', desc: '力量小站累计完成 30 次坐站起坐', got: totalReps >= 30 },
+    // icon 为 index.html 内联 Lucide sprite 的 symbol id
+    { id: 'first', icon: 'i-sparkles', name: '迈出第一步', desc: '完成第一次训练', got: j.stampsTotal > 0 || st.totalSessions > 0 },
+    { id: 'd3', icon: 'i-sprout', name: '三日之约', desc: '连续打卡 3 天', got: st.best >= 3 },
+    { id: 'd7', icon: 'i-leaf', name: '七日同行', desc: '连续打卡 7 天', got: st.best >= 7 },
+    { id: 'd21', icon: 'i-trees', name: '廿一日养成', desc: '连续打卡 21 天', got: st.best >= 21 },
+    { id: 'd30', icon: 'i-mountain', name: '月度坚持', desc: '连续打卡 30 天', got: st.best >= 30 },
+    { id: 'km10', icon: 'i-compass', name: '十里春风', desc: '累计行走 10 公里', got: j.totalKm >= 10 },
+    { id: 'km50', icon: 'i-wind', name: '日行千里', desc: '累计行走 50 公里', got: j.totalKm >= 50 },
+    { id: 's30', icon: 'i-book-open', name: '文牒渐满', desc: '累计集章 30 枚', got: j.stampsTotal >= 30 },
+    { id: 's144', icon: 'i-trophy', name: '环游山河', desc: '集齐十三景 156 枚印章（环游一圈）', got: j.rounds >= 1 },
+    { id: 'reps30', icon: 'i-dumbbell', name: '起坐达人', desc: '力量小站累计完成 30 次坐站起坐', got: totalReps >= 30 },
   ];
   return list;
 }

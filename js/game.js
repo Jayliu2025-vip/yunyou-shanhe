@@ -28,6 +28,13 @@ const KM_MILESTONE_LINES = [
 ];
 const COMBO_LINES = ['手眼协调真棒！', '连着摘到好几个，眼明手快！', '这波配合真流畅！'];
 
+// 健康小知识提示条的灯泡图标（Lucide lightbulb，ISC License；canvas 无法引用
+// index.html 内联 sprite，改用一次性 data-URL 预加载，未就绪时自动省略不占位）
+const tipBulb = new Image();
+tipBulb.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ffe9a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>'
+);
+
 export class Game {
   constructor({ canvas, body, hr, audio, profile, journey, settings, onEvent, onHud }) {
     this.canvas = canvas;
@@ -912,7 +919,10 @@ export class Game {
         ctx.fillStyle = '#ffe9a8';
         ctx.font = `600 15px system-ui, sans-serif`;
         ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-        ctx.fillText('💡 康复小知识', cx - cw / 2 + 20, cy - chh / 2 + 22);
+        const bulbReady = tipBulb.complete && tipBulb.naturalWidth > 0;
+        const tipLabelX = cx - cw / 2 + (bulbReady ? 44 : 20);
+        if (bulbReady) ctx.drawImage(tipBulb, cx - cw / 2 + 16, cy - chh / 2 + 13, 18, 18);
+        ctx.fillText('康复小知识', tipLabelX, cy - chh / 2 + 22);
         ctx.fillStyle = '#fff';
         ctx.font = `400 16px system-ui, sans-serif`;
         // 简单折行
@@ -953,12 +963,13 @@ export class Game {
       : `${scene.name} · 第${this.journey.sceneIndex + 1}站`;
     ctx.font = `22px ${FONT_KAI}`;
     const w = ctx.measureText(text).width + 60;
-    roundRect(ctx, W / 2 - w / 2, 14, w, 40, 20);
+    // y=70：置于 DOM 顶栏（HUD，高约 66 CSS px）下方，避免与"剩余 mm:ss"倒计时重叠
+    roundRect(ctx, W / 2 - w / 2, 70, w, 40, 20);
     ctx.fillStyle = 'rgba(30,42,56,0.55)';
     ctx.fill();
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(text, W / 2, 35);
+    ctx.fillText(text, W / 2, 91);
     ctx.restore();
   }
 

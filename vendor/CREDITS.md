@@ -15,5 +15,9 @@
 - 许可证：Apache License 2.0（见 `vendor/LICENSE`，随本仓库一并分发以满足
   Apache 2.0 第 4 条"保留许可副本"的要求）
 - 本项目对上述文件**未做任何修改**，仅本地化存放以实现完全离线运行
+- 线性图标（`vendor/lucide/`，Lucide Icons）为 ISC License 原样副本，来源
+  npm 包 lucide-static@0.544.0；实际以精简后的内联 SVG sprite 形式嵌入
+  index.html（<symbol> 定义 + <use> 引用），本目录留存源文件与
+  完整许可文本（LICENSE）以满足 ISC 第 3 条要求
 - 音效素材（`assets/audio/`，Kenney「Interface Sounds」）为 CC0，见其目录内 CREDITS.md；
   照片素材许可见 `assets/photos/CREDITS.md`
