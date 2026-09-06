@@ -20,6 +20,12 @@ const IN_WECHAT = /MicroMessenger/i.test(navigator.userAgent) || new URLSearchPa
 // 预加载第 1、2 站实景照片（其余按需；缺图自动回退程序化场景）
 preloadScenePhotosAround(0);
 
+// 提前拉取楷体子集 webfont：canvas 印章/景点字在字体就绪后即以楷体渲染，
+// 就绪前自动回退系统字体（画面逐帧重绘，无需额外等待逻辑）
+if (document.fonts?.load) {
+  document.fonts.load('700 16px "LXGW WenKai GB Screen"', '云游山河康0');
+}
+
 /* ---------------- 全局状态 ---------------- */
 
 let settings = store.getSettings();

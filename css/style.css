@@ -1,25 +1,37 @@
 /* 云游山河 —— 暖纸 + 墨色 + 印章红的中国风界面，大字体适老设计
-   v2 美化：远山背景 · 渐变印章 · 玻璃拟态 HUD · 移动端安全区与触控优化 */
+   v2 美化：远山背景 · 渐变印章 · 玻璃拟态 HUD · 移动端安全区与触控优化
+   色板取自中国传统色（zhongguose.com 系开源色卡）：宣纸/墨/朱砂/藤黄/石绿/黛 */
+
+/* 开源楷体：霞鹜文楷 GB 屏读版（OFL-1.1，按用字子集约 326KB，随 SW 离线缓存）
+   —— 安卓/微信内无 KaiTi，原本会退化成宋体；置于字体栈首位统一三端观感 */
+@font-face {
+  font-family: "LXGW WenKai GB Screen";
+  src: url("../assets/fonts/LXGWWenKaiGBScreen-Subset.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
-  --paper: #f6f1e7;
+  color-scheme: light;               /* 微信/浏览器深色模式不强制反色（界面为暖纸色系） */
+  --paper: #f6f1e7;                  /* 宣纸 */
   --paper-2: #efe8d8;
   --paper-3: #e7dcc4;
-  --ink: #2b3a4a;
-  --ink-soft: #5a6b7d;
-  --seal: #b03a2e;
+  --ink: #2b3a4a;                    /* 墨 */
+  --ink-soft: #5a6b7d;               /* 淡墨 */
+  --seal: #b03a2e;                   /* 朱砂 */
   --seal-deep: #8e2f26;
   --seal-bright: #c94b3c;
-  --gold: #c9971e;
+  --gold: #c9971e;                   /* 藤黄/描金 */
   --gold-bright: #e0b33c;
   --gold-soft: #e8d5a0;
-  --jade: #3d7a6a;
+  --jade: #3d7a6a;                   /* 石绿 */
   --jade-bright: #4f9a86;
   --card: #fffdf8;
   --shadow: 0 3px 14px rgba(43, 58, 74, 0.12);
   --shadow-lg: 0 10px 34px rgba(43, 58, 74, 0.16);
   --radius: 16px;
-  --font-kai: "STKaiti", "KaiTi", "SimSun", serif;
+  --font-kai: "LXGW WenKai GB Screen", "STKaiti", "KaiTi", "SimSun", serif;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
@@ -28,7 +40,15 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-html { font-size: 18px; }
+html {
+  font-size: 18px;
+  /* 微信安卓 WebView 的"字体放大"会破坏布局（微信-我-设置-字体大小） */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* 键盘/遥控焦点可见（桌面演示模式与无障碍） */
+:focus-visible { outline: 3px solid rgba(224, 179, 60, .8); outline-offset: 2px; border-radius: 4px; }
 
 body {
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
