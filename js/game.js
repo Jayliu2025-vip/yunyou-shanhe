@@ -6,10 +6,11 @@
  * - 集章系统：每景点集齐 12 枚印章 → 盖章仪式 → 解锁下一景点
  */
 import { CONFIG, targetHrZone } from './config.js';
-import { SCENES, PXKM, drawWorld, HEALTH_TIPS, preloadScenePhotosAround, ensureScenePhoto } from './scenes.js';
+import { SCENES, drawWorld, HEALTH_TIPS, preloadScenePhotosAround, ensureScenePhoto, cachedGrad } from './scenes.js';
 
 const G = CONFIG.game;
 const T = CONFIG.tempo;
+const EX = CONFIG.exercise;
 const FONT_KAI = '"STKaiti","KaiTi","SimSun",serif';
 
 const ENCOURAGEMENTS = [
@@ -73,6 +74,13 @@ export class Game {
     this.celebrate = null;     // {until, scene, startedAt}
     this.transition = null;    // {from, to, startedAt}
     this.phaseTitle = null;    // {text, sub, until}
+    // 力量小站（v1.3：主运动间歇坐站，plan.strengthBlocks 开启）
+    this.block = null;         // {state:'announce'|'active', title, startedAt, until, repsAtStart, nextStampReps, lastReps, lastHintAt}
+    this.blockNextAt = Infinity;
+    this.blockSkip = false;    // RPE≥5 → 跳过下一个小站
+    this.sitStandReps = 0;     // 本次训练起坐总数
+    this.sitStandBase = null;  // BodyInput 累计计数基线（BodyInput 跨局复用，需取差值）
+    this.blocksRun = 0;
     this.rpeNextAt = 0;
     this.rpeSamples = [];
     this.samples = [];         // 每5秒采样
@@ -127,6 +135,14 @@ export class Game {
     this.paused = false;
     this._lastFrame = performance.now();
     preloadScenePhotosAround(this.journey.sceneIndex); // 当前站+下一站照片按需预取
+    // BodyInput 对象跨局复用（同模式不重建），步数与起坐计数是页面累计值 → 取当前值为基线，防跨局重复累计
+    this.lastSteps = this.body ? this.body.steps : 0;
+    this.sitStandBase = this.body ? this.body.sitStandReps : null;
+    // 力量小站排期：主运动开始 90 秒后第一个（有氧先进入稳态），默认关闭；
+    // 快速体验模式压缩为热身结束即小站，便于演示/调试完整流程
+    this.blockNextAt = this.plan.strengthBlocks
+      ? this.plan.warmupSec + (this.plan.quick ? 5 : EX.firstBlockAfterSec)
+      : Infinity;
     // 背景巡游：15 秒后开始"远眺"其他风景（暂停时 simTime 停走，巡游同步暂停）
     this.displayScene = SCENES[this.journey.sceneIndex];
     this.tourNextAt = CONFIG.scene.tourSec > 0 ? CONFIG.scene.tourSec : Infinity;
@@ -136,6 +152,10 @@ export class Game {
       ? '训练开始。本次以疲劳感觉和症状为主：保持能说话、但唱不了歌的强度；如有胸闷气短头晕，请立即停止。先热身，跟着脚印的节奏轻轻踏步。'
       : '训练开始。先热身，跟着屏幕下方脚印的节奏，轻轻踏步。';
     this.audio.speak(intro, true);
+    // 力量小站：开场告知椅子前置要求（安全底线：稳固、靠墙、无轮）
+    if (this.plan.strengthBlocks) {
+      this.audio.speak('本次已开启力量小站。请准备一把稳固、靠墙、无轮子的椅子，放在镜头前，稍后会提示您做坐站练习。', true);
+    }
     this.sceneNames.push(SCENES[this.journey.sceneIndex].name);
     this.onEvent({ type: 'scene-intro', scene: SCENES[this.journey.sceneIndex] });
     this._resize();
@@ -190,7 +210,10 @@ export class Game {
       maxCadence: cadSamples.length ? Math.max(...cadSamples) : 0,
       stampsEarned: this.stampsEarned,
       itemsCaught: this.itemsCaught,
-      kcal: this.stepsThisSession * G.kcalPerStep,
+      sitStandReps: this.sitStandReps || 0,   // 力量小站：本次起坐总数
+      blocksRun: this.blocksRun || 0,         // 力量小站：完成组数
+      strengthBlocks: !!this.plan.strengthBlocks,
+      kcal: this.stepsThisSession * (this.profile.weightKg || 70) * G.kcalPerStepPerKg, // 按档案体重折算
       rpeSamples: this.rpeSamples,
       hrSeries: this.hrSeries,
       samples: this.samples,
@@ -247,11 +270,24 @@ export class Game {
     this._phaseTime[this.phase] = (this._phaseTime[this.phase] || 0) + dt;
 
     /* --- 步数与里程 --- */
-    const dSteps = Math.max(0, bs.steps - this.lastSteps);
-    this.lastSteps = bs.steps;
-    this.stepsThisSession += dSteps;
+    // 力量小站进行中：起坐动作可能被摆臂后备误计为"步" → 暂停里程累计（安全语义：小站不产生有氧里程）
+    if (this.block && this.block.state === 'active') {
+      this.lastSteps = bs.steps;
+    } else {
+      const dSteps = Math.max(0, bs.steps - this.lastSteps);
+      this.lastSteps = bs.steps;
+      this.stepsThisSession += dSteps;
+    }
     this.sessionKm = this.stepsThisSession / G.stepsPerKm;
     this.dispCadence += (bs.cadence - this.dispCadence) * Math.min(1, dt * 2);
+
+    /* --- 力量小站：累计本次训练起坐总数（取差值，兼容 BodyInput 跨局复用） --- */
+    if (bs.sitStand) {
+      if (this.sitStandBase == null || bs.sitStand.reps < this.sitStandBase) {
+        this.sitStandBase = bs.sitStand.reps;
+      }
+      this.sitStandReps = bs.sitStand.reps - this.sitStandBase;
+    }
 
     /* --- 里程碑（趣味反馈：只夸出勤与坚持，不催强度） --- */
     if (this.stepsThisSession >= this.nextStepMilestone) {
@@ -266,12 +302,14 @@ export class Game {
       this.audio.speak(pickLine(KM_MILESTONE_LINES));
     }
 
-    // 视觉前进速度：随实际步频，保留轻微"风"的漂移
-    const speedFactor = 0.12 + 0.88 * Math.min(1.3, this.dispCadence / T.start);
+    // 视觉前进速度：随实际步频，保留轻微"风"的漂移；小站坐站期间画面近乎静止
+    const blockActive = !!(this.block && this.block.state === 'active');
+    const speedFactor = blockActive ? 0.15 : 0.12 + 0.88 * Math.min(1.3, this.dispCadence / T.start);
     this.visDist += 0.001285 * speedFactor * dt;
 
-    /* --- 节拍器（连续合拍时叠加亮色泛音，正反馈"踩在点上"） --- */
-    const beatPeriod = 60 / this.tempo;
+    /* --- 节拍器（连续合拍时叠加亮色泛音，正反馈"踩在点上"；小站期间节拍即起坐节拍） --- */
+    const beatTempo = blockActive ? EX.blockTempo : this.tempo;
+    const beatPeriod = 60 / beatTempo;
     const inSyncBeat = this.phase === 'main' && this.syncTime > 2;
     this.beatAcc += dt;
     while (this.beatAcc >= beatPeriod) {
@@ -331,8 +369,11 @@ export class Game {
     /* --- 心率安全 --- */
     this._updateHr(dt);
 
-    /* --- 物件生成 --- */
-    const canSpawn = bs.ok && this.phase !== 'cooldown' && !this.celebrate;
+    /* --- 力量小站状态机（预告 → 坐站 → 收尾；RPE 弹窗暂停时 simTime 冻结自然顺延） --- */
+    this._updateBlock(dt, bs);
+
+    /* --- 物件生成（小站期间印章改由起坐数发放，见 _updateBlock） --- */
+    const canSpawn = bs.ok && this.phase !== 'cooldown' && !this.celebrate && !this.block;
     if (canSpawn) {
       const mul = this.phase === 'warmup' ? 2.2 : 1;
       this.stampTimer -= dt / mul;
@@ -368,8 +409,9 @@ export class Game {
       }
     }
 
-    /* --- 合拍奖励 --- */
-    if (this.phase === 'main' && Math.abs(this.dispCadence - this.tempo) <= G.syncTolerance && this.dispCadence > 40) {
+    /* --- 合拍奖励（小站期间不累计：坐站节奏与步频处方是两回事，不混淆强度语义） --- */
+    if (this.phase === 'main' && !blockActive
+      && Math.abs(this.dispCadence - this.tempo) <= G.syncTolerance && this.dispCadence > 40) {
       this.syncTime += dt;
       if (this.syncTime >= G.syncBonusSec) {
         this.syncTime = 0;
@@ -443,14 +485,106 @@ export class Game {
     }
   }
 
+  /* ---------------- 力量小站（间歇坐站，plan.strengthBlocks 开启） ---------------- */
+
+  /** 当前起坐节拍（HUD/脚印显示用）：小站期间为慢速坐站节拍，其余为步频处方 */
+  _effTempo() {
+    return this.block && this.block.state === 'active' ? EX.blockTempo : this.tempo;
+  }
+
+  _updateBlock(dt, bs) {
+    const b = this.block;
+    if (b) {
+      // 阶段推进（simTime 在暂停时冻结，RPE/休息弹窗天然顺延小站）
+      if (this.simTime >= b.until) {
+        if (b.state === 'announce') {
+          b.state = 'active';
+          b.startedAt = this.simTime;
+          b.until = this.simTime + EX.blockDurSec;
+        } else {
+          this._endBlock(false);
+          return;
+        }
+      }
+      if (b.state === 'active') {
+        b.lastReps = Math.max(0, this.sitStandReps - b.repsAtStart);
+        // 起坐驱动发章：每 repsPerStamp 次起坐一枚（数量被 75s×15次/分 封顶，不奖励快和猛）
+        if (b.lastReps >= b.nextStampReps) {
+          b.nextStampReps += EX.repsPerStamp;
+          this._spawnItem('stamp');
+          this.audio.stamp();
+        }
+        // 膝部不可见（镜头太近/坐姿出画）：温和提醒，不惩罚
+        if (bs.mode === 'camera' && bs.sitStand && !bs.sitStand.ok
+          && this.simTime - (b.lastHintAt || 0) > 15) {
+          b.lastHintAt = this.simTime;
+          this.audio.speak('请让全身入镜，看到膝盖才能计数起坐。也可以点"跳过小站"继续踏步。');
+        }
+      }
+      return;
+    }
+    // 到点开小站：跳过本站（RPE≥5）则顺延
+    if (this.phase !== 'main') return;
+    if (this.simTime < this.blockNextAt) return;
+    if (this.celebrate || this.transition) return;
+    if (this.blockSkip) {
+      this.blockSkip = false;
+      this.blockNextAt = this.simTime + EX.blockEverySec;
+      this.audio.speak('您刚才反馈比较累，这个小站先跳过，继续轻松踏步。');
+      return;
+    }
+    this._beginBlock(bs);
+  }
+
+  _beginBlock(bs) {
+    // 武当山站的小站做主题包装（"不只是风景"：太极文化与坐站桩功呼应）
+    const theme = SCENES[this.journey.sceneIndex].id === 'wudang' ? '太极桩功' : '力量小站';
+    this.block = {
+      state: 'announce',
+      title: `${theme} · 坐站`,
+      startedAt: this.simTime,
+      until: this.simTime + EX.announceSec,
+      repsAtStart: this.sitStandReps,
+      nextStampReps: EX.repsPerStamp,
+      lastReps: 0,
+      lastHintAt: 0,
+    };
+    this.audio.chime();
+    this.audio.speak(`${theme}时间到。请面向椅子，扶稳、慢慢坐下，跟着节拍起坐；慢起慢坐不憋气，不舒服就跳过。`, true);
+    this._showPhaseTitle(this.block.title, '慢起慢坐 · 不憋气 · 可随时跳过');
+    this.events.push({ t: Math.round(this.simTime), type: 'block-start', title: this.block.title });
+  }
+
+  _endBlock(skipped) {
+    const b = this.block;
+    this.block = null;
+    this.blockNextAt = this.simTime + EX.blockEverySec;
+    this.events.push({ t: Math.round(this.simTime), type: skipped ? 'block-skip' : 'block-end', reps: b.lastReps || 0 });
+    if (skipped) {
+      this.audio.speak('好的，跳过小站，继续踏步，舒服最重要。');
+      this._showPhaseTitle('已跳过小站', '继续踏步，保持节奏');
+      return;
+    }
+    this.blocksRun++;
+    this.audio.milestone();
+    this.audio.speak(`小站完成！刚才完成了 ${b.lastReps || 0} 次起坐。腿上有力量，走得才稳当。休息一下，继续踏步。`);
+    this._showPhaseTitle('小站完成', '继续踏步，保持节奏');
+  }
+
+  /** 玩家主动跳过当前小站（HUD"跳过小站"按钮） */
+  skipBlock() {
+    if (!this.block) return;
+    this._endBlock(true);
+  }
+
   _updateCoaching(dt, bs) {
     // 身体丢失提示
     if (!bs.ok && bs.mode === 'camera') {
       this.noBodySince = this.noBodySince || this.simTime;
     } else this.noBodySince = null;
 
-    // 步频太低提示（主运动阶段）
-    if (this.phase === 'main' && this.dispCadence > 0 && this.dispCadence < this.tempo - 25) {
+    // 步频太低提示（主运动阶段；力量小站期间坐站节拍本来就低，不提醒）
+    if (this.phase === 'main' && !this.block && this.dispCadence > 0 && this.dispCadence < this.tempo - 25) {
       this.lowCadenceSince = this.lowCadenceSince || this.simTime;
       if (this.simTime - this.lowCadenceSince > 12) {
         this.lowCadenceSince = this.simTime;
@@ -483,6 +617,7 @@ export class Game {
       this.phaseDur = this.plan.cooldownSec;
       this.tempo = T.cooldown;
       this.items = [];
+      this.block = null;   // 主运动结束时小站未完成则直接作废（整理阶段只做放松）
       this._showPhaseTitle('整理放松', '放慢脚步，跟着圆圈深呼吸');
       this.audio.chime();
       this.audio.speak('运动部分完成，很棒！慢慢放松，跟着圆圈调整呼吸。', true);
@@ -619,6 +754,8 @@ export class Game {
     }
     if (v >= 5) {
       this.tempo = Math.max(T.min, this.tempo + T.rpeHighAdjust);
+      // 力量小站：RPE≥5 跳过下一个小站（安全优先，见 config.exercise.rpeSkipAt）
+      if (this.plan.strengthBlocks) this.blockSkip = true;
       this.audio.speak('明白，我们把节奏放慢一些，舒服最重要。');
       this._showPhaseTitle('已放慢节奏', '目标步频 ' + this.tempo + ' 步/分');
     } else if (v <= 2 && this.phase === 'main') {
@@ -645,7 +782,7 @@ export class Game {
       totalRemain,
       progress: this._totalProgress(),
       cadence: Math.round(this.dispCadence),
-      tempo: this.tempo,
+      tempo: this._effTempo(),   // 小站期间显示坐站节拍
       stamps: this.journey.stampsInScene,
       stampsNeed: this.stampCardNeed,
       stampsTotal: this.journey.stampsTotal,
@@ -660,6 +797,13 @@ export class Game {
       distanceKm: this.sessionKm.toFixed(2),
       paused: this.paused,
       pauseReason: this.pauseReason,
+      // 力量小站实时状态（HUD 显示起坐数/倒计时 + 跳过按钮显隐）
+      block: this.block ? {
+        state: this.block.state,
+        title: this.block.title,
+        remain: Math.max(0, Math.ceil(this.block.until - this.simTime)),
+        reps: this.block.state === 'active' ? Math.max(0, this.sitStandReps - this.block.repsAtStart) : 0,
+      } : null,
     };
   }
 
@@ -716,16 +860,22 @@ export class Game {
     // 物件
     for (const it of this.items) this._drawItem(ctx, W, H, it, t);
 
-    // 手部光点
+    // 手部光点（渐变按固定半径缓存，平移到原点绘制）
     if (this.bodyState && this.bodyState.wrists) {
       for (const w of this.bodyState.wrists) {
         if ((w.vis ?? 1) < 0.4) continue;
         const x = w.x * W, y = w.y * H;
-        const g = ctx.createRadialGradient(x, y, 2, x, y, 26);
-        g.addColorStop(0, 'rgba(255,235,150,0.9)');
-        g.addColorStop(1, 'rgba(255,235,150,0)');
+        const g = cachedGrad('wrist', () => {
+          const gr = ctx.createRadialGradient(0, 0, 2, 0, 0, 26);
+          gr.addColorStop(0, 'rgba(255,235,150,0.9)');
+          gr.addColorStop(1, 'rgba(255,235,150,0)');
+          return gr;
+        });
+        ctx.save();
+        ctx.translate(x, y);
         ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(x, y, 26, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(0, 0, 26, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
       }
     }
 
@@ -893,12 +1043,13 @@ export class Game {
       ctx.fill();
       ctx.restore();
     }
-    // 目标步频
+    // 目标步频（小站期间改为起坐节拍提示）
     ctx.globalAlpha = 0.85;
     ctx.fillStyle = '#fff';
     ctx.strokeStyle = 'rgba(30,42,56,0.5)';
     ctx.lineWidth = 3;
-    const label = `目标 ${this.tempo} 步/分`;
+    const blockActive = this.block && this.block.state === 'active';
+    const label = blockActive ? `起坐节拍 ${EX.blockTempo} 次/分` : `目标 ${this.tempo} 步/分`;
     ctx.font = `600 16px system-ui, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const tw = ctx.measureText(label).width + 20;
@@ -941,10 +1092,13 @@ export class Game {
     ctx.translate(x, y);
     const pulse = 1 + Math.sin(t * 3 + it.seed) * 0.04;
     ctx.scale(pulse * appear, pulse * appear);
-    // 光晕
-    const g = ctx.createRadialGradient(0, 0, s * 0.2, 0, 0, s * 1.8);
-    g.addColorStop(0, 'rgba(255,230,140,0.5)');
-    g.addColorStop(1, 'rgba(255,230,140,0)');
+    // 光晕（按尺寸缓存渐变，避免每帧新建）
+    const g = cachedGrad(`item:${Math.round(s)}`, () => {
+      const gr = ctx.createRadialGradient(0, 0, s * 0.2, 0, 0, s * 1.8);
+      gr.addColorStop(0, 'rgba(255,230,140,0.5)');
+      gr.addColorStop(1, 'rgba(255,230,140,0)');
+      return gr;
+    });
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0, 0, s * 1.8, 0, Math.PI * 2); ctx.fill();
 

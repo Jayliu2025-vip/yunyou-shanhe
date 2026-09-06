@@ -1,5 +1,5 @@
 /**
- * 十二景 · 云游中国
+ * 十三景 · 云游中国
  * 每个景点：专属配色 + 标志性剪影（塔/驼队/长城/宫殿……），全部用 Canvas 程序化绘制。
  * 视差滚动由累计里程驱动，配合踏步节奏产生"行走于山河之间"的感受。
  */
@@ -15,6 +15,16 @@ function hex2rgb(h) {
 export function mixColor(c1, c2, t) {
   const a = hex2rgb(c1), b = hex2rgb(c2);
   return `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(a[2] + (b[2] - a[2]) * t)})`;
+}
+
+/* ---------------- 渐变缓存（性能：避免每帧新建 CanvasGradient，减少中低端机 GC 卡顿） ---------------- */
+
+const gradCache = new Map();
+/** 按 key 缓存渐变；key 须包含影响几何的全部变量（场景 id 与画布宽高），窗口缩放自然失效重建 */
+export function cachedGrad(key, make) {
+  let g = gradCache.get(key);
+  if (!g) { g = make(); gradCache.set(key, g); }
+  return g;
 }
 
 /* ---------------- 剪影绘制辅助 ---------------- */
@@ -265,7 +275,32 @@ function birds(ctx, x, y, s, c, t) {
   }
 }
 
-/* ---------------- 十二景数据 ---------------- */
+/* ---------------- 十三景数据 ---------------- */
+
+// 太极图腾（武当）：路面上的阴阳鱼石雕，随行进与时间缓缓转动
+function taijiStone(ctx, x, y, s, c, t) {
+  const r = s * 0.2;
+  ctx.save();
+  ctx.translate(x, y + s * 0.3);
+  ctx.rotate(t * 0.35);
+  ctx.globalAlpha = 0.8;
+  // 石座
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.beginPath(); ctx.ellipse(0, r * 0.95, r * 1.15, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+  // 阴阳鱼：白底 + 黑右半 + 两个小半圆互嵌 + 双鱼眼
+  ctx.fillStyle = '#efe8d4';
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#3c4a56';
+  ctx.beginPath(); ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, -r / 2, r / 2, -Math.PI / 2, Math.PI / 2); ctx.fill();
+  ctx.fillStyle = '#efe8d4';
+  ctx.beginPath(); ctx.arc(0, r / 2, r / 2, -Math.PI / 2, Math.PI / 2); ctx.fill();
+  ctx.fillStyle = '#3c4a56';
+  ctx.beginPath(); ctx.arc(0, -r / 2, r * 0.16, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#efe8d4';
+  ctx.beginPath(); ctx.arc(0, r / 2, r * 0.16, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
 
 export const SCENES = [
   {
@@ -399,6 +434,18 @@ export const SCENES = [
     motif: { fn: potala, every: 6000, layer: 1, s: 130 },
     birds: true,
   },
+  {
+    id: 'wudang', name: '武当仙山', ch: '武', sub: '山不在高，有仙则名',
+    photo: 'assets/photos/wudang.jpg',
+    intro: '武当山是道教圣地，明代皇家道观依山而建，金顶在云雾中时隐时现。相传张三丰在此悟创太极拳，以柔克刚、动静相生。',
+    tips: ['1994年列入世界文化遗产', '金顶铜殿六百年不锈', '太极拳发源于此的传说'],
+    sky: ['#c9dae4', '#f0ece0'], sun: { x: 0.76, y: 0.18, r: 0.05, c: '#ffe6b8', type: 'sun' },
+    far: '#a8bcc4', mid: '#7e9a8c', near: '#5c7a68', ground: '#b8c8a8', path: '#ddd4bc',
+    mist: true, ridge: [{ a: 0.08, wl: 500 }, { a: 0.10, wl: 340 }],
+    motif: { fn: palaceHall, every: 5200, layer: 1, s: 130 },
+    extra: (ctx, x, y, s, c, t) => { taijiStone(ctx, x, y, s, c, t); },
+    birds: true,
+  },
 ];
 
 /** 整理放松阶段的康复小知识（每 20 秒轮换一条）
@@ -473,9 +520,12 @@ function drawPhotoWorld(ctx, W, H, scene, t, distKm, opts = {}) {
   }
   // 底部道路（照片渐变过渡，人走在路上）
   const top = H * 0.8;
-  const g = ctx.createLinearGradient(0, top - H * 0.1, 0, top + H * 0.04);
-  g.addColorStop(0, 'rgba(52,64,46,0)');
-  g.addColorStop(1, 'rgba(52,64,46,0.92)');
+  const g = cachedGrad(`road:${Math.round(H)}`, () => {
+    const gr = ctx.createLinearGradient(0, top - H * 0.1, 0, top + H * 0.04);
+    gr.addColorStop(0, 'rgba(52,64,46,0)');
+    gr.addColorStop(1, 'rgba(52,64,46,0.92)');
+    return gr;
+  });
   ctx.fillStyle = g;
   ctx.fillRect(0, top - H * 0.1, W, H * 0.14);
   ctx.fillStyle = 'rgba(58,70,52,0.95)';
@@ -494,9 +544,12 @@ function drawPhotoWorld(ctx, W, H, scene, t, distKm, opts = {}) {
     ctx.fill();
   }
   // 顶部渐晕，保证 HUD 可读
-  const vg = ctx.createLinearGradient(0, 0, 0, H * 0.16);
-  vg.addColorStop(0, 'rgba(14,22,30,0.42)');
-  vg.addColorStop(1, 'rgba(14,22,30,0)');
+  const vg = cachedGrad(`vig:${Math.round(H)}`, () => {
+    const gr = ctx.createLinearGradient(0, 0, 0, H * 0.16);
+    gr.addColorStop(0, 'rgba(14,22,30,0.42)');
+    gr.addColorStop(1, 'rgba(14,22,30,0)');
+    return gr;
+  });
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, W, H * 0.16);
   ctx.restore();
@@ -542,11 +595,29 @@ function drawClouds(ctx, W, H, t, strong, c = 'rgba(255,255,255,0.75)') {
   }
 }
 
+/** 山间轻雾：几条缓慢飘移的半透明白色雾带（标注 mist 的景点；世界坐标驱动行进感，风格与照片层轻雾一致） */
+function drawMist(ctx, W, H, t, worldPx) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.13)';
+  const off = (worldPx * 0.5) % (W * 1.5);
+  for (let i = 0; i < 3; i++) {
+    const y = H * (0.46 + i * 0.075) + Math.sin(t * 0.25 + i * 2.1) * H * 0.012;
+    const x = ((i * W * 0.7 + off) % (W * 1.5)) - W * 0.25;
+    ctx.beginPath();
+    ctx.ellipse(x, y, W * (0.3 + (i % 2) * 0.16), H * 0.028, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawWater(ctx, W, H, scene, t, distKm) {
   const top = H * scene.water.top, bottom = H * 0.8;
-  const g = ctx.createLinearGradient(0, top, 0, bottom);
-  g.addColorStop(0, scene.water.c);
-  g.addColorStop(1, mixColor(scene.water.c, '#ffffff', 0.35));
+  const g = cachedGrad(`water:${scene.id}:${Math.round(H)}`, () => {
+    const gr = ctx.createLinearGradient(0, top, 0, bottom);
+    gr.addColorStop(0, scene.water.c);
+    gr.addColorStop(1, mixColor(scene.water.c, '#ffffff', 0.35));
+    return gr;
+  });
   ctx.fillStyle = g;
   ctx.fillRect(0, top, W, bottom - top);
   // 波光
@@ -567,9 +638,12 @@ function drawWater(ctx, W, H, scene, t, distKm) {
 
 function drawGround(ctx, W, H, scene, distKm, mixNext) {
   const top = H * 0.8;
-  const g = ctx.createLinearGradient(0, top, 0, H);
-  g.addColorStop(0, mixColor(scene.ground, '#ffffff', 0.12));
-  g.addColorStop(1, scene.ground);
+  const g = cachedGrad(`ground:${scene.id}:${Math.round(H)}`, () => {
+    const gr = ctx.createLinearGradient(0, top, 0, H);
+    gr.addColorStop(0, mixColor(scene.ground, '#ffffff', 0.12));
+    gr.addColorStop(1, scene.ground);
+    return gr;
+  });
   ctx.fillStyle = g;
   ctx.fillRect(0, top, W, H - top);
   // 走的道路（浅色带）
@@ -604,22 +678,29 @@ export function drawWorld(ctx, W, H, scene, t, distKm, opts = {}) {
   ctx.globalAlpha = alpha;
 
   // 天空
-  const g = ctx.createLinearGradient(0, 0, 0, H * 0.85);
-  g.addColorStop(0, scene.sky[0]);
-  g.addColorStop(1, scene.sky[1]);
+  const g = cachedGrad(`sky:${scene.id}:${Math.round(H)}`, () => {
+    const gr = ctx.createLinearGradient(0, 0, 0, H * 0.85);
+    gr.addColorStop(0, scene.sky[0]);
+    gr.addColorStop(1, scene.sky[1]);
+    return gr;
+  });
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
 
   const worldPx = distKm * PXKM;
 
-  // 日 / 月
+  // 日 / 月（泰山日出 rise 动画逐帧移动 → 不缓存该景光晕）
   const sun = scene.sun;
   const sx = W * sun.x, sy = H * sun.y - (sun.rise ? Math.sin(t * 0.05) * 6 : 0);
   const sr = W * sun.r;
-  const halo = ctx.createRadialGradient(sx, sy, sr * 0.2, sx, sy, sr * 2.6);
-  halo.addColorStop(0, sun.c);
-  halo.addColorStop(0.35, mixColor(sun.c, '#ffffff', 0.35));
-  halo.addColorStop(1, 'rgba(255,255,255,0)');
+  const halo = sun.rise ? ctx.createRadialGradient(sx, sy, sr * 0.2, sx, sy, sr * 2.6)
+    : cachedGrad(`halo:${scene.id}:${Math.round(W)}:${Math.round(H)}`, () => {
+      const gr = ctx.createRadialGradient(sx, sy, sr * 0.2, sx, sy, sr * 2.6);
+      gr.addColorStop(0, sun.c);
+      gr.addColorStop(0.35, mixColor(sun.c, '#ffffff', 0.35));
+      gr.addColorStop(1, 'rgba(255,255,255,0)');
+      return gr;
+    });
   ctx.fillStyle = halo;
   ctx.fillRect(sx - sr * 2.6, sy - sr * 2.6, sr * 5.2, sr * 5.2);
   ctx.fillStyle = sun.c;
@@ -635,6 +716,9 @@ export function drawWorld(ctx, W, H, scene, t, distKm, opts = {}) {
   drawRidge(ctx, W, H, H * 0.62, scene.mid, worldPx * 0.45, scene, 1);
   // 中景剪影（大部分景点的主剪影在这层）
   if (scene.motif.layer === 1) drawMotifs(ctx, W, H, scene, worldPx * 0.45, scene.mid, 0.62);
+
+  // 山间轻雾（标注 mist 的景点：张家界/武当等；随行进飘移）
+  if (scene.mist) drawMist(ctx, W, H, t, worldPx);
 
   // 水面
   if (scene.water) drawWater(ctx, W, H, scene, t, distKm);

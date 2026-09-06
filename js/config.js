@@ -83,7 +83,7 @@ export const CONFIG = {
     itemLifeSec: 8,          // 物件停留时长
     syncBonusSec: 18,        // 踩准节拍持续 N 秒 → 奖励一枚金印
     syncTolerance: 9,        // 步频与目标误差 ±9 步/分 内算"合拍"
-    kcalPerStep: 0.045,      // 能量消耗粗估（kcal/步，60~75kg 人群）
+    kcalPerStepPerKg: 0.00064, // 能量消耗粗估（kcal/步/公斤；原 0.045 kcal/步 ≈ 70kg 人群，v1.3.1 起按档案体重折算）
   },
 
   // 背景画面巡游（v1.2：同一景点内每隔 N 秒"远眺"另一处风景，2 秒缓变淡切不闪眼；
@@ -91,6 +91,33 @@ export const CONFIG = {
   scene: {
     tourSec: 15,
     tourFadeSec: 2.0,
+  },
+
+  // 力量小站（v1.3）：主运动中的间歇坐站练习，设置页勾选后由 plan.strengthBlocks 开启。
+  // 依据：《中国人群身体活动指南（2021）》65岁+每周至少3天大肌群力量与健骨练习；
+  // WHO《身体活动与久坐行为指南（2020）》老年人多成分活动强调功能性力量（≥3天/周）；
+  // 《World guidelines for falls prevention and management for older adults》
+  // （Montero-Odasso 2022, Age and Ageing 51(9)）——渐进抗阻力量训练为运动干预核心成分；
+  // Otago 运动方案：坐站起始 4次×2组、进阶至10次×2组，慢速、可扶椅；
+  // 《中国心血管疾病患者居家康复专家共识（2022）》：抗阻训练低~中强度、不憋气（无 Valsalva）。
+  exercise: {
+    firstBlockAfterSec: 90,  // 主运动开始 90 秒后进行第一个小站（先让有氧进入稳态）
+    blockEverySec: 240,      // 之后每 4 分钟一个小站（20 分钟主运动约 4~5 个）
+    blockDurSec: 75,         // 每小站 75 秒 ≈ Otago 一组慢速坐站（约 10~15 次）
+    blockTempo: 15,          // 小站节拍：每分钟起坐周期（约 4 秒一次，慢起慢坐）
+    repsPerStamp: 3,         // 每完成 3 次起坐发一枚印章（总量被时长×慢节拍封顶，不奖励快和猛）
+    announceSec: 5,          // 小站预告时长（语音 + 大字提示，留出走到椅子的时间）
+    rpeSkipAt: 5,            // RPE ≥5 自动跳过下一个小站（≥6 仍走 rpe-hard 休息流程）
+    sitStand: {
+      standKneeAngle: 160,   // 膝角（髋-膝-踝）≥160° 判定站直
+      sitKneeAngle: 110,     // 膝角 ≤110° 判定坐稳（两阈间为滞回区，抗抖动）
+      minRepIntervalMs: 2000,// 两次起坐最小间隔（防抖，与 blockTempo=15 呼应）
+      // 踝部不可见（镜头偏近）时的退化判定：站立时髋明显高于膝，坐位时接近
+      hipKneeRatioStand: 0.40, // (膝y-髋y)/躯干 ≥ 此值 → 站立
+      hipKneeRatioSit: 0.25,   // (膝y-髋y)/躯干 ≤ 此值 → 坐稳
+    },
+    // 注：检测系数基于 MediaPipe Pose（lite）归一化坐标设定，尚待大样本校准（同 CLAUDE.md 已知事项）；
+    // 如需按患者情况调整，只改此处，勿在 game.js/pose.js 内散落魔法数。
   },
 };
 

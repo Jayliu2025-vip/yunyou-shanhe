@@ -37,21 +37,34 @@ const root = __dirname;
 
 http.createServer((req, res) => {
   try {
-    let urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    // 仅允许只读方法（静态预览服务器，无写接口）
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.writeHead(405, { Allow: 'GET, HEAD' }); res.end(); return;
+    }
+    let urlPath;
+    try { urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
+    catch (e) { res.writeHead(400); res.end('Bad Request'); return; }
     if (urlPath === '/') urlPath = '/index.html';
+    // 路径安全：拒绝残余 ".." 段与反斜杠（防编码绕过），并用 relative 严格判定仍位于站点根内
+    // （startsWith 前缀判定在 Windows 大小写不敏感/同级同名前缀目录下不可靠）
+    if (urlPath.includes('\\') || urlPath.split('/').includes('..')) { res.writeHead(403); res.end(); return; }
     const file = path.normalize(path.join(root, urlPath));
-    if (!file.startsWith(root)) { res.writeHead(403); res.end(); return; }
+    const rel = path.relative(root, file);
+    if (rel === '' || path.isAbsolute(rel) || rel.split(path.sep).includes('..')) {
+      res.writeHead(403); res.end(); return;
+    }
     fs.readFile(file, (err, data) => {
       if (err) { res.writeHead(404); res.end('Not Found'); return; }
       res.writeHead(200, {
         'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
         'Cache-Control': 'no-cache',
       });
-      res.end(data);
+      res.end(req.method === 'HEAD' ? undefined : data);
     });
   } catch (e) {
     res.writeHead(500); res.end('Server Error');
   }
 }).listen(port, host, () => {
   console.log(`云游山河 → http://localhost:${port}`);
+  if (host === '0.0.0.0') console.log('（已监听局域网：手机与电脑同一 WiFi 时可用 http://<电脑IP>:' + port + ' 访问）');
 });

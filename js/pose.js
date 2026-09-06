@@ -2,19 +2,24 @@
  * 人体姿态输入模块
  * 两种模式：
  *  1. 摄像头模式：MediaPipe PoseLandmarker（本地 vendor/ 模型，离线可用）
- *  2. 演示模式：键盘←→踏步 + 鼠标当手（无摄像头也能跑通全流程，便于演示与调试）
+ *  2. 演示模式：键盘←→踏步、↑起坐 + 鼠标当手（无摄像头也能跑通全流程，便于演示与调试）
  *
  * 对游戏引擎统一输出 BodyState：
- *  { ok, wrists[], reach{cx,shoulderY,minX,maxX,torso}, steps, cadence, mode }
+ *  { ok, wrists[], reach{cx,shoulderY,minX,maxX,torso}, steps, cadence,
+ *    sitStand{reps,ok}, mode }
  *
  * 踏步检测原理：踝相对髋的垂直距离（用躯干长度归一化，抗远近变化），
  * 带"站立基线自适应 + 滞回"的抗抖动判定；腿部不可见（如坐姿镜头偏近）时
  * 自动切换为摆臂检测。
+ * 坐站检测原理（力量小站）：髋-膝-踝膝角滞回判定（站≥160°/坐≤110°，阈值见
+ * config.exercise.sitStand），起身沿计 1 次；踝不可见时退化为髋-膝垂直高度比。
  */
+
+import { CONFIG } from './config.js';
 
 const L = {
   nose: 0, lSh: 11, rSh: 12, lWr: 15, rWr: 16,
-  lHip: 23, rHip: 24, lAn: 27, rAn: 28,
+  lHip: 23, rHip: 24, lKnee: 25, rKnee: 26, lAn: 27, rAn: 28,
 };
 const CONNECTIONS = [
   [L.lSh, L.rSh], [L.lSh, 13], [13, L.lWr], [L.rSh, 14], [14, L.rWr],
@@ -38,6 +43,11 @@ export class BodyInput {
     this.footState = { l: 'down', r: 'down' };
     this.armState = { l: 'down', r: 'down' };
     this.lastStepAt = 0;
+    // 坐站检测状态（力量小站）
+    this.sitStandState = null;           // 'seated' | 'standing' | null（初始未知）
+    this.sitStandReps = 0;               // 本次页面会话累计起坐次数
+    this.sitStandAvailable = false;      // 膝部是否可见（决定小站能否计数）
+    this.lastSitStandAt = 0;
     // 平滑后的关键点（已镜像，归一化坐标）
     this.sm = null;
     // 演示模式输入
@@ -106,6 +116,11 @@ export class BodyInput {
         e.preventDefault();
         this._registerStep(performance.now(), 'demo');
       }
+      // 演示模式：↑/W 键模拟一次起坐（力量小站计数用）
+      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        this._registerSitStand(performance.now());
+      }
     };
     window.addEventListener('keydown', this._keyHandler);
     this._pointerHandler = (e) => {
@@ -141,6 +156,13 @@ export class BodyInput {
     this._registerStep(performance.now(), 'tap');
   }
 
+  /** 记一次起坐（演示模式键盘/自动；摄像头模式由 _detectSitStand 计数） */
+  _registerSitStand(now) {
+    if (now - this.lastSitStandAt < CONFIG.exercise.sitStand.minRepIntervalMs) return;
+    this.lastSitStandAt = now;
+    this.sitStandReps++;
+  }
+
   /* ---------------- 每帧更新（由游戏主循环调用） ---------------- */
 
   update(now) {
@@ -168,6 +190,12 @@ export class BodyInput {
         this._autoStepAcc -= 1;
         this._registerStep(now, 'auto');
       }
+      // 自动演示：每 4 秒一次起坐（力量小站可完整自动播放）
+      this._autoSSAcc = (this._autoSSAcc || 0) + dt / 4;
+      while (this._autoSSAcc >= 1) {
+        this._autoSSAcc -= 1;
+        this._registerSitStand(now);
+      }
       // 自动挥手（展示时会自然摘到物件）
       const t = now / 1000;
       this.pointer = {
@@ -182,6 +210,7 @@ export class BodyInput {
       reach: { cx: 0.5, shoulderY: 0.38, minX: 0.12, maxX: 0.88, torso: 0.24 },
       steps: this.steps,
       cadence: this._cadence(now),
+      sitStand: { reps: this.sitStandReps, ok: true },
       legsVisible: false,
     };
   }
@@ -190,7 +219,7 @@ export class BodyInput {
   _smooth() {
     const a = 0.45; // 平滑系数
     const pts = {};
-    for (const k of ['lSh', 'rSh', 'lWr', 'rWr', 'lHip', 'rHip', 'lAn', 'rAn']) {
+    for (const k of ['lSh', 'rSh', 'lWr', 'rWr', 'lHip', 'rHip', 'lKnee', 'rKnee', 'lAn', 'rAn']) {
       const raw = this.lm[L[k]];
       pts[k] = { x: 1 - raw.x, y: raw.y, v: raw.visibility ?? 1 };
     }
@@ -204,7 +233,10 @@ export class BodyInput {
 
   _computeState(now) {
     if (!this.sm) {
-      return { ok: false, mode: 'camera', wrists: null, reach: defaultReach(), steps: this.steps, cadence: 0, legsVisible: false };
+      return {
+        ok: false, mode: 'camera', wrists: null, reach: defaultReach(), steps: this.steps,
+        cadence: 0, sitStand: { reps: this.sitStandReps, ok: false }, legsVisible: false,
+      };
     }
     const s = this.sm;
     const shMid = { x: (s.lSh.x + s.rSh.x) / 2, y: (s.lSh.y + s.rSh.y) / 2 };
@@ -216,6 +248,7 @@ export class BodyInput {
     if (ok) {
       if (legsVisible) this._detectStepsLegs(torso, now);
       else this._detectStepsArms(shMid, torso, now);
+      this._detectSitStand(torso, now); // 坐站检测（力量小站）；膝部不可见时仅置 unavailable
     }
     this._pruneSteps(now);
 
@@ -235,8 +268,48 @@ export class BodyInput {
       },
       steps: this.steps,
       cadence: this._cadence(now),
+      sitStand: { reps: this.sitStandReps, ok: this.sitStandAvailable },
       legsVisible,
     };
+  }
+
+  /** 坐站检测（力量小站）：膝角（髋-膝-踝中点向量）滞回判定，起身沿计 1 次；
+   *  踝不可见（镜头偏近）时退化为髋-膝垂直高度比；膝不可见时仅置 unavailable 不计数 */
+  _detectSitStand(torso, now) {
+    const s = this.sm;
+    const SS = CONFIG.exercise.sitStand;
+    const kneeVis = s.lKnee.v > 0.5 && s.rKnee.v > 0.5;
+    this.sitStandAvailable = kneeVis;
+    if (!kneeVis) return;
+
+    const hipY = (s.lHip.y + s.rHip.y) / 2;
+    const kneeX = (s.lKnee.x + s.rKnee.x) / 2, kneeY = (s.lKnee.y + s.rKnee.y) / 2;
+    let seated; // true=坐稳 false=站直 null=滞回区间（保持原状态）
+    if (s.lAn.v > 0.5 && s.rAn.v > 0.5) {
+      const anX = (s.lAn.x + s.rAn.x) / 2, anY = (s.lAn.y + s.rAn.y) / 2;
+      const v1x = (s.lHip.x + s.rHip.x) / 2 - kneeX, v1y = hipY - kneeY;
+      const v2x = anX - kneeX, v2y = anY - kneeY;
+      const dot = v1x * v2x + v1y * v2y;
+      const m = Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y) || 1e-6;
+      const ang = Math.acos(Math.min(1, Math.max(-1, dot / m))) * 180 / Math.PI;
+      if (ang >= SS.standKneeAngle) seated = false;
+      else if (ang <= SS.sitKneeAngle) seated = true;
+      else seated = null;
+    } else {
+      const rel = (kneeY - hipY) / (torso || 0.2); // 站立时髋明显高于膝 → 值大
+      if (rel >= SS.hipKneeRatioStand) seated = false;
+      else if (rel <= SS.hipKneeRatioSit) seated = true;
+      else seated = null;
+    }
+    if (seated === null) return;
+    const prev = this.sitStandState;
+    this.sitStandState = seated ? 'seated' : 'standing';
+    // 起坐计数：从"坐稳"到"站直"的上升沿（Otago 计数口径），带最小间隔防抖
+    if (prev === 'seated' && seated === false
+      && now - this.lastSitStandAt >= SS.minRepIntervalMs) {
+      this.lastSitStandAt = now;
+      this.sitStandReps++;
+    }
   }
 
   /** 腿部踏步：踝-髋垂直距离 / 躯干长度，自适应站立基线（按时间衰减，与帧率无关）+ 滞回 */

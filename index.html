@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>云游山河 · 心脏康复集章之旅</title>
 <link rel="icon" href="favicon.ico">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -28,14 +30,15 @@
   <section id="screen-home" class="screen">
     <header class="home-hero">
       <div class="hero-stamp stamp-lg">游</div>
-      <div>
+      <div class="hero-title">
         <h1>云游山河</h1>
         <p class="subtitle">心脏康复 · 集章之旅</p>
       </div>
       <div class="hero-stamp stamp-lg stamp-red">康</div>
     </header>
+    <div class="ink-divider" aria-hidden="true"><span class="line"></span><span class="diamond"></span><span class="line"></span></div>
 
-    <p class="home-intro">原地踏步，云游中国十二景；抬手摘印，集齐通关文牒。<br>每天一段，让康复像旅行一样有趣。</p>
+    <p class="home-intro">原地踏步，云游中国十三景；抬手摘印，间歇坐站。<br>集齐通关文牒，让康复像旅行一样有趣。</p>
 
     <button id="btn-start" class="btn btn-primary btn-xl btn-pulse">🚶 开始今日旅程</button>
 
@@ -83,6 +86,11 @@
             <input type="number" id="in-resthr" min="40" max="110" value="70">
             <span class="unit">次/分</span>
           </div>
+          <div class="form-row">
+            <label>体重（热量估算用）</label>
+            <input type="number" id="in-weight" min="35" max="150" value="70">
+            <span class="unit">公斤</span>
+          </div>
           <label class="check-row">
             <input type="checkbox" id="ck-beta">
             <span>我服用<b>β受体阻滞剂</b>或装有<b>起搏器</b>（心率指标仅供参考，以疲劳感觉为主）</span>
@@ -96,6 +104,10 @@
             <label>主运动时长</label>
             <span id="mainsec-choices" class="choice-group"></span>
           </div>
+          <label class="check-row">
+            <input type="checkbox" id="ck-blocks">
+            <span><b>力量小站</b>：主运动中插入间歇坐站练习（需一把<b>稳固、靠墙、无轮子</b>的椅子；默认关闭，依据老年人身体活动指南力量练习建议）</span>
+          </label>
           <div class="form-row">
             <label>目标心率（自动计算）</label>
             <b id="hr-zone-text">—</b>
@@ -117,7 +129,7 @@
           </div>
           <label class="check-row demo-row">
             <input type="checkbox" id="ck-demo">
-            <span><b>演示模式</b>：无需摄像头，用 ←→ 键踏步、鼠标当手（适合展示与调试）</span>
+            <span><b>演示模式</b>：无需摄像头，用 ←→ 键踏步、<b>↑ 键起坐</b>、鼠标当手（适合展示与调试）</span>
           </label>
           <label class="check-row demo-row" id="row-auto">
             <input type="checkbox" id="ck-auto">
@@ -181,6 +193,8 @@
       <!-- 步频（左下，预览之上） -->
       <div class="hud hud-cadence">
         <span class="chip chip-cadence">步频 <b id="hud-cadence">0</b> / 目标 <b id="hud-tempo">92</b></span>
+        <span class="chip chip-block hidden" id="hud-block">🪑 <b id="hud-block-reps">0</b> 次 · 剩 <b id="hud-block-time">0</b> 秒</span>
+        <button id="btn-block-skip" class="btn-block-skip hidden">跳过小站</button>
       </div>
 
       <!-- 摄像头预览（左下角） -->
@@ -321,12 +335,12 @@
       <div class="hero-stamp stamp-lg">牒</div>
       <div>
         <h2>通关文牒</h2>
-        <p class="subtitle" id="passport-sub">山河十二景 · 集章之旅</p>
+        <p class="subtitle" id="passport-sub">山河十三景 · 集章之旅</p>
       </div>
     </header>
     <div class="journey-bar">
       <div class="journey-progress"><div id="journey-fill"></div></div>
-      <span id="journey-text">0 / 96 枚</span>
+      <span id="journey-text">0 / 156 枚</span>
     </div>
     <div id="passport-grid" class="passport-grid"></div>
     <div class="setup-actions">
@@ -379,8 +393,8 @@
         </div>
         <div class="card">
           <h3>关于</h3>
-          <p class="hint">云游山河 v1.2 —— 冠心病 II/III 期（居家）心脏康复体感游戏原型。<br>
-          运动方案：中等强度有氧（踏步）+ 上肢关节活动（摘取），三段式课程结构；安全策略参照 2026 ESC 心脏康复指南与《中国心血管疾病患者居家康复专家共识》。<br>
+          <p class="hint">云游山河 v1.3.1 —— 冠心病 II/III 期（居家）心脏康复体感游戏原型。<br>
+          运动方案：中等强度有氧（踏步）+ 上肢关节活动（摘取）+ 力量小站（间歇坐站，可选开启），三段式课程结构；有氧与安全策略参照 2026 ESC 心脏康复指南与《中国心血管疾病患者居家康复专家共识》，力量与平衡参照《中国人群身体活动指南（2021）》与 WHO《身体活动与久坐行为指南（2020）》。<br>
           <b>本游戏为科研原型，不能替代医嘱；训练方案请遵康复医师指导。</b></p>
         </div>
       </div>
@@ -414,6 +428,13 @@ window.addEventListener('error', function (e) {
   d.textContent = '程序出错：' + (e.message || e.error) + ' （可按 F12 查看详情）';
   document.body.appendChild(d);
 });
+// PWA：Service Worker 注册（仅 HTTPS / localhost；文件协议静默跳过）
+if ('serviceWorker' in navigator
+  && (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () { /* 离线缓存注册失败不影响使用 */ });
+  });
+}
 </script>
 <script type="module" src="js/main.js"></script>
 </body>

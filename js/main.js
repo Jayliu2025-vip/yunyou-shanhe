@@ -74,7 +74,9 @@ function renderSetup() {
   const p = store.getProfile();
   $('in-age').value = p.age;
   $('in-resthr').value = p.restingHr;
+  $('in-weight').value = p.weightKg || 70;
   $('ck-beta').checked = !!p.betaBlocker;
+  $('ck-blocks').checked = !!p.strengthBlocks;
   const modeRadio = document.querySelector(`input[name="mode"][value="${p.mode}"]`);
   if (modeRadio) modeRadio.checked = true;
   selectedMainSec = p.mainSec || 1200;
@@ -103,9 +105,11 @@ function currentProfileFromForm() {
   return {
     age: clamp(parseInt($('in-age').value, 10) || 55, 30, 90),
     restingHr: clamp(parseInt($('in-resthr').value, 10) || 70, 40, 110),
+    weightKg: clamp(parseInt($('in-weight').value, 10) || 70, 35, 150),
     betaBlocker: $('ck-beta').checked,
     mode: document.querySelector('input[name="mode"]:checked').value,
     mainSec: selectedMainSec,
+    strengthBlocks: $('ck-blocks').checked,   // 力量小站（间歇坐站），默认关闭
   };
 }
 
@@ -225,6 +229,7 @@ async function startSession() {
     intensityHigh: clinic ? CONFIG.medical.clinic.intensityHigh : CONFIG.medical.intensityHigh,
   });
   plan.setting = clinic ? 'clinic' : 'home';
+  plan.strengthBlocks = !!profile.strengthBlocks;   // 力量小站由设置页勾选开启（默认关闭）
   if (clinic) {
     plan.hrOverLimitSec = CONFIG.medical.clinic.hrOverLimitPauseSec;
     plan.rpePromptIntervalSec = CONFIG.medical.clinic.rpePromptIntervalSec;
@@ -387,6 +392,14 @@ function updateHud(h) {
   $('hud-stamps-need').textContent = h.stampsNeed;
   $('hud-cadence').textContent = h.cadence;
   $('hud-tempo').textContent = h.tempo;
+  // 力量小站：显示起坐数与倒计时，并提供跳过按钮（安全通道）
+  const blk = h.block;
+  $('hud-block').classList.toggle('hidden', !blk);
+  $('btn-block-skip').classList.toggle('hidden', !blk);
+  if (blk) {
+    $('hud-block-reps').textContent = blk.reps;
+    $('hud-block-time').textContent = blk.remain;
+  }
   const chip = $('hud-hr-chip');
   $('hud-hr').textContent = h.hr || (h.rpePrimary ? 'RPE主控' : '--');
   chip.title = !h.hr
@@ -458,6 +471,9 @@ function handleSessionEnd(session, updatedJourney) {
     d.push('心率：' + (monText[session.monitor] || '本次未连接心率带（以疲劳感觉控制强度）'));
   }
   if (session.snapshot.betaBlocker) d.push('服用β受体阻滞剂：已按 RPE 为主控强度');
+  if (session.strengthBlocks) {
+    d.push(`力量小站：完成 <b>${session.blocksRun || 0}</b> 组，共 <b>${session.sitStandReps || 0}</b> 次坐站起坐`);
+  }
   d.push('到访景点：' + session.sceneNames.join(' → '));
   $('summary-detail').innerHTML = d.map(x => `<div>· ${x}</div>`).join('');
 
@@ -518,7 +534,7 @@ function drawHrSpark(session) {
 
 function renderPassport() {
   const j = store.getJourney();
-  $('passport-sub').textContent = `山河十二景 · 集章之旅${j.rounds > 0 ? ` · 已环游 ${j.rounds} 圈` : ''}`;
+  $('passport-sub').textContent = `山河十三景 · 集章之旅${j.rounds > 0 ? ` · 已环游 ${j.rounds} 圈` : ''}`;
   const total = SCENES.length * CONFIG.game.stampCardNeed;
   $('journey-fill').style.width = Math.min(100, j.stampsTotal / total * 100) + '%';
   $('journey-text').textContent = `${j.stampsTotal} / ${total} 枚`;
@@ -544,7 +560,6 @@ function renderSettings() {
   $('set-sound').checked = settings.sound;
   $('set-speech').checked = settings.speech;
   fillVoiceSelect();
-  const cfg = settings.cfg || {};
   $('cfg-int-lo').value = CONFIG.medical.intensityLow;
   $('cfg-int-hi').value = CONFIG.medical.intensityHigh;
   $('cfg-rpe-int').value = CONFIG.medical.rpePromptIntervalSec;
@@ -706,6 +721,11 @@ function bind() {
       game && game.answerRpe(parseInt(b.dataset.v, 10));
     };
   });
+  // 力量小站跳过按钮（安全通道：不舒服随时跳过回到踏步）
+  $('btn-block-skip').onclick = () => {
+    if (!game || !game.running) return;
+    game.skipBlock();   // 内部已带跳过语音与事件记录
+  };
   $('btn-rest-resume').onclick = () => {
     $('rest-overlay').classList.add('hidden');
     stopRestHrWatcher();

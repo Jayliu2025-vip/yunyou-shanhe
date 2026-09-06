@@ -33,9 +33,11 @@ export function getProfile() {
     name: '',
     age: 55,
     restingHr: 70,
+    weightKg: 70,            // 体重（热量估算按体重折算）
     betaBlocker: false,      // 服用β受体阻滞剂 / 植入起搏器
     mode: 'standing',        // standing | seated
     mainSec: 1200,
+    strengthBlocks: false,   // 力量小站（间歇坐站），默认关闭（v1.3）
   });
 }
 export function saveProfile(p) { saveJSON(KEYS.profile, p); }
@@ -56,7 +58,7 @@ export function saveSettings(s) { saveJSON(KEYS.settings, s); }
 export function getJourney() {
   return loadJSON(KEYS.journey, {
     totalKm: 0,              // 累计里程（公里）
-    sceneIndex: 0,           // 当前景点下标（0~11，循环）
+    sceneIndex: 0,           // 当前景点下标（0~12，共十三景，循环）
     stampsInScene: 0,        // 当前景点已集印章数
     stampsTotal: 0,          // 累计印章数
     rounds: 0,               // 完整环游中国圈数
@@ -123,7 +125,7 @@ export function exportCSV() {
     '日期', '结束方式', '场景', '监护方式', '姿势', '总时长秒', '热身秒', '主运动秒', '整理秒',
     '步数', '里程公里', '平均步频', '最高步频', '印章数', '物件数',
     '估算千卡', 'RPE记录', '心率均值', '心率峰值', '心率样本数',
-    '自动暂停次数', '景点',
+    '自动暂停次数', '力量小站开关', '力量小站组数', '起坐次数', '景点',
   ];
   const MON_LABEL = { hr: '心率设备', manual: '手动脉搏', rpe: '无设备(RPE主控)' };
   const esc = v => {
@@ -138,7 +140,9 @@ export function exportCSV() {
     s.kcal.toFixed(1),
     (s.rpeSamples || []).map(r => `${Math.round(r.t / 60)}分:${r.v}`).join(' '),
     s.hrAvg ?? '', s.hrMax ?? '', (s.hrSeries || []).length,
-    s.autoPauses ?? 0, (s.sceneNames || []).join('→'),
+    s.autoPauses ?? 0,
+    s.strengthBlocks ? '开' : '关', s.blocksRun ?? 0, s.sitStandReps ?? 0,
+    (s.sceneNames || []).join('→'),
   ].map(esc).join(','));
   return '\uFEFF' + cols.join(',') + '\n' + rows.join('\n'); // BOM 方便 Excel 中文
 }
@@ -171,6 +175,7 @@ export function resetAll() {
 export function badges() {
   const j = getJourney();
   const st = streakInfo();
+  const totalReps = getSessions().reduce((a, s) => a + (s.sitStandReps || 0), 0);
   const list = [
     { id: 'first', icon: '🏮', name: '迈出第一步', desc: '完成第一次训练', got: j.stampsTotal > 0 || st.totalSessions > 0 },
     { id: 'd3', icon: '🌱', name: '三日之约', desc: '连续打卡 3 天', got: st.best >= 3 },
@@ -180,7 +185,8 @@ export function badges() {
     { id: 'km10', icon: '🧭', name: '十里春风', desc: '累计行走 10 公里', got: j.totalKm >= 10 },
     { id: 'km50', icon: '🐎', name: '日行千里', desc: '累计行走 50 公里', got: j.totalKm >= 50 },
     { id: 's30', icon: '📖', name: '文牒渐满', desc: '累计集章 30 枚', got: j.stampsTotal >= 30 },
-    { id: 's144', icon: '🎖️', name: '环游山河', desc: '集齐十二景 144 枚印章（环游一圈）', got: j.rounds >= 1 },
+    { id: 's144', icon: '🎖️', name: '环游山河', desc: '集齐十三景 156 枚印章（环游一圈）', got: j.rounds >= 1 },
+    { id: 'reps30', icon: '🪑', name: '起坐达人', desc: '力量小站累计完成 30 次坐站起坐', got: totalReps >= 30 },
   ];
   return list;
 }
