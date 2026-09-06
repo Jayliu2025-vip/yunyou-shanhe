@@ -11,7 +11,7 @@ import { SCENES, drawWorld, HEALTH_TIPS, preloadScenePhotosAround, ensureScenePh
 const G = CONFIG.game;
 const T = CONFIG.tempo;
 const EX = CONFIG.exercise;
-const FONT_KAI = '"STKaiti","KaiTi","SimSun",serif';
+const FONT_KAI = '"LXGW WenKai GB Screen","STKaiti","KaiTi","SimSun",serif';
 
 const ENCOURAGEMENTS = [
   '走得很好，继续保持！', '山河正美，脚步正稳！', '很棒，就这样不紧不慢地走。',

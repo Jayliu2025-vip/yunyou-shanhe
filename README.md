@@ -112,6 +112,7 @@ js/audio.js           WebAudio 合成音效 + 中文语音教练（零素材依�
 js/hr.js              心率接入三通道：Web Bluetooth（0x180D）/ WebSocket 研究设备 / 手动输入
 js/storage.js         localStorage 记录、打卡/徽章、CSV/JSON 导出
 assets/photos/        13 景实景照片（约1.7MB，q7 压缩、SSIM≥0.98；来源与许可见 CREDITS.md）
+assets/fonts/         霞鹜文楷 GB 屏读版 webfont 子集（326KB，OFL-1.1，三端统一楷体；见 CREDITS.md）
 manifest.json/sw.js   PWA：主屏图标与离线缓存（页面网络优先、静态资源缓存优先+后台更新；版本号失效）
 vendor/               MediaPipe 模型与 WASM（本地化，**完全离线运行，无需外网**；Apache 2.0，见 vendor/CREDITS.md 与 vendor/LICENSE）
 miniprogram/          微信小程序 web-view 壳（可直接导入微信开发者工具，见下节）
@@ -178,6 +179,10 @@ Otago 运动方案（坐站 4次×2组起步、慢速、可扶椅）。
 - **姿态识别**（vendor/）：Google MediaPipe Tasks Vision（vision_bundle.mjs、WASM 运行时）
   与 Pose Landmarker lite 模型，**Apache License 2.0**——原样分发、未做修改，
   已随仓库附完整许可文本（`vendor/LICENSE`）与来源清单（`vendor/CREDITS.md`）；
+- **楷体字体**（assets/fonts/）：霞鹜文楷 GB 屏读版（LXGW WenKai GB Screen，基于
+  Fontworks Klee One），**SIL OFL 1.1**——按界面用字子集化为 webfont（约 326KB），
+  该用途为 OFL 附加许可条款明确允许，未修改字形轮廓、不作为可安装桌面字体分发；
+  许可全文与处理说明见 `assets/fonts/LICENSE-OFL.txt` 与 `assets/fonts/CREDITS.md`；
 - **其余全部原创**：代码、界面、水墨程序化背景、印章 favicon、景点文案与康复小知识均为本项目原创；
 - **医学指南/文献**（README §八）：仅作观点引用与出处标注，未复制原文表述；
 - 项目本体为科研原型，未附加开源许可证（默认保留所有权利）；如需对外发布或他人使用，

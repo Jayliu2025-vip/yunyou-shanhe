@@ -29,6 +29,10 @@ Page({
         showCancel: false,
       });
     }
+    // 同时开放「发送给朋友」与「分享到朋友圈」入口
+    if (wx.showShareMenu) {
+      wx.showShareMenu({ menus: ['shareAppMessage', 'shareTimeline'] });
+    }
   },
 
   // H5 可在关键时刻调用 wx.miniProgram.postMessage({ data: {...} })
@@ -41,6 +45,12 @@ Page({
     return {
       title: '云游山河 · 心脏康复集章之旅',
       path: '/pages/index/index',
+    };
+  },
+
+  onShareTimeline() {
+    return {
+      title: '云游山河 · 心脏康复集章之旅',
     };
   },
 });

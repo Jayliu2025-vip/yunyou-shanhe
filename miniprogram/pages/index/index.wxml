@@ -1,7 +1,15 @@
 <web-view wx:if="{{configured}}" src="{{url}}" bindmessage="onMessage"></web-view>
 
+<!-- 未配置 H5 地址时的引导页（样式与 H5 端"宣纸+印章"品牌一致） -->
 <view wx:else class="setup-tip">
-  <view class="tip-icon">🗺️</view>
-  <text class="tip-title">尚未配置游戏地址</text>
-  <text class="tip-body">请在 pages/index/index.js 中把 H5_URL 替换为已部署（HTTPS 备案域名）并加入小程序「业务域名」的游戏地址。接入步骤见仓库 README 第七节。</text>
+  <view class="tip-seal">启</view>
+  <text class="tip-title">云游山河</text>
+  <view class="tip-divider"><view class="line"></view><view class="diamond"></view><view class="line"></view></view>
+  <text class="tip-body">游戏地址尚未配置，请按以下步骤接入：</text>
+  <view class="tip-steps">
+    <text class="step">1. 部署 H5 到已备案的 HTTPS 域名</text>
+    <text class="step">2. 将地址填入 pages/index/index.js 的 H5_URL</text>
+    <text class="step">3. 在公众平台「业务域名」中添加该域名</text>
+  </view>
+  <text class="tip-more">详细步骤见仓库 README 第七节</text>
 </view>
