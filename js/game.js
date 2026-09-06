@@ -6,7 +6,7 @@
  * - 集章系统：每景点集齐 12 枚印章 → 盖章仪式 → 解锁下一景点
  */
 import { CONFIG, targetHrZone } from './config.js';
-import { SCENES, PXKM, drawWorld, HEALTH_TIPS } from './scenes.js';
+import { SCENES, PXKM, drawWorld, HEALTH_TIPS, preloadScenePhotosAround, ensureScenePhoto } from './scenes.js';
 
 const G = CONFIG.game;
 const T = CONFIG.tempo;
@@ -16,6 +16,16 @@ const ENCOURAGEMENTS = [
   '走得很好，继续保持！', '山河正美，脚步正稳！', '很棒，就这样不紧不慢地走。',
   '呼吸顺畅，步履从容，真好！', '今日份的健康，正在稳稳积累！',
 ];
+
+// 里程碑语音（步数每 500 步 / 里程每 0.5km 随机一条；只夸出勤与坚持，不催强度）
+const STEP_MILESTONE_LINES = [
+  '已经 {n} 步啦，每一步都算数！', '{n} 步达成，稳稳的，真好！',
+  '走到 {n} 步了，山河都记着呢！',
+];
+const KM_MILESTONE_LINES = [
+  '又走了半公里，真不错！', '里程悄悄涨了半公里，继续保持！', '半公里的风景又被你收进文牒啦！',
+];
+const COMBO_LINES = ['手眼协调真棒！', '连着摘到好几个，眼明手快！', '这波配合真流畅！'];
 
 export class Game {
   constructor({ canvas, body, hr, audio, profile, journey, settings, onEvent, onHud }) {
@@ -79,6 +89,18 @@ export class Game {
     this.stampsEarned = 0;
     this.itemsCaught = 0;
     this.sessionKm = 0;
+    this.scenesCompleted = 0;   // 本次完成盖章仪式（集齐一站）的次数
+    // 背景远眺巡游（只换背景照片层，当前景点/印章语义不变）
+    this.displayScene = null;   // 当前显示的背景场景
+    this.tourFade = null;       // {from, to, startedAt} 淡切过渡
+    this.tourNextAt = Infinity;
+    // 趣味反馈状态（v1.2：连击/里程碑/末印预告）
+    this.combo = 0;
+    this.lastCatchAt = -99;
+    this.comboPraiseAt = -99;
+    this.nextStepMilestone = 500;
+    this.nextKmMilestone = 0.5;
+    this.lastMinuteAnnounced = false;
   }
 
   /* ---------------- 生命周期 ---------------- */
@@ -87,6 +109,9 @@ export class Game {
     this.reset();
     this.plan = plan;
     this.hrZone = plan.hrZone;
+    // 监护方式：'hr'=实时心率（蓝牙/研究设备）；'manual'=手动脉搏；'rpe'=无设备（RPE+症状+说话测试）
+    this.monitor = plan.monitor || 'rpe';
+    this.rpePrimary = this.monitor !== 'hr' || !!this.profile.betaBlocker;
     // 院内监护模式：更快的超限响应与更频繁的 RPE 询问
     this.hrOverLimitSec = plan.hrOverLimitSec ?? CONFIG.medical.hrOverLimitPauseSec;
     this.rpeInterval = plan.rpePromptIntervalSec ?? CONFIG.medical.rpePromptIntervalSec;
@@ -101,8 +126,16 @@ export class Game {
     this.running = true;
     this.paused = false;
     this._lastFrame = performance.now();
+    preloadScenePhotosAround(this.journey.sceneIndex); // 当前站+下一站照片按需预取
+    // 背景巡游：15 秒后开始"远眺"其他风景（暂停时 simTime 停走，巡游同步暂停）
+    this.displayScene = SCENES[this.journey.sceneIndex];
+    this.tourNextAt = CONFIG.scene.tourSec > 0 ? CONFIG.scene.tourSec : Infinity;
     this._showPhaseTitle('热身开始', '跟着脚印轻轻踏步，活动开身体');
-    this.audio.speak('训练开始。先热身，跟着屏幕下方脚印的节奏，轻轻踏步。', true);
+    // 无设备模式开场告知安全主控方式（说话测试口诀，CSANZ 2023 / 中国居家康复共识口径）
+    const intro = this.monitor === 'rpe'
+      ? '训练开始。本次以疲劳感觉和症状为主：保持能说话、但唱不了歌的强度；如有胸闷气短头晕，请立即停止。先热身，跟着脚印的节奏轻轻踏步。'
+      : '训练开始。先热身，跟着屏幕下方脚印的节奏，轻轻踏步。';
+    this.audio.speak(intro, true);
     this.sceneNames.push(SCENES[this.journey.sceneIndex].name);
     this.onEvent({ type: 'scene-intro', scene: SCENES[this.journey.sceneIndex] });
     this._resize();
@@ -147,7 +180,9 @@ export class Game {
       endedBy,
       mode: this.plan.mode,
       setting: this.plan.setting || 'home',
+      monitor: this.monitor,          // 'hr' | 'manual' | 'rpe'（无设备模式）
       quick: !!this.plan.quick,
+      scenesCompleted: this.scenesCompleted,  // 本次集齐整站（盖章仪式）次数
       durationSec: dur,
       steps: this.stepsThisSession,
       distanceKm: this.sessionKm,
@@ -218,16 +253,30 @@ export class Game {
     this.sessionKm = this.stepsThisSession / G.stepsPerKm;
     this.dispCadence += (bs.cadence - this.dispCadence) * Math.min(1, dt * 2);
 
+    /* --- 里程碑（趣味反馈：只夸出勤与坚持，不催强度） --- */
+    if (this.stepsThisSession >= this.nextStepMilestone) {
+      const n = this.nextStepMilestone;
+      this.nextStepMilestone += 500;
+      this.audio.milestone();
+      this.audio.speak(pickLine(STEP_MILESTONE_LINES).replace('{n}', n));
+    }
+    if (this.sessionKm >= this.nextKmMilestone) {
+      this.nextKmMilestone += 0.5;
+      this.audio.milestone();
+      this.audio.speak(pickLine(KM_MILESTONE_LINES));
+    }
+
     // 视觉前进速度：随实际步频，保留轻微"风"的漂移
     const speedFactor = 0.12 + 0.88 * Math.min(1.3, this.dispCadence / T.start);
     this.visDist += 0.001285 * speedFactor * dt;
 
-    /* --- 节拍器 --- */
+    /* --- 节拍器（连续合拍时叠加亮色泛音，正反馈"踩在点上"） --- */
     const beatPeriod = 60 / this.tempo;
+    const inSyncBeat = this.phase === 'main' && this.syncTime > 2;
     this.beatAcc += dt;
     while (this.beatAcc >= beatPeriod) {
       this.beatAcc -= beatPeriod;
-      this.audio.tick(this.beatStrong);
+      this.audio.tick(this.beatStrong, inSyncBeat);
       this.beatStrong = !this.beatStrong;
     }
     this.beatPhase = this.beatAcc / beatPeriod;
@@ -237,6 +286,12 @@ export class Game {
       if (this.phase === 'warmup') this._enterPhase('main');
       else if (this.phase === 'main') this._enterPhase('cooldown');
       else { this.finishSession('completed'); return; }
+    }
+
+    /* --- 主运动最后一分钟播报（告知进度，不催促） --- */
+    if (this.phase === 'main' && !this.lastMinuteAnnounced && this.phaseDur - this.phaseElapsed <= 60) {
+      this.lastMinuteAnnounced = true;
+      this.audio.speak('主运动还剩最后一分钟，稳住这个节奏就好，很棒！');
     }
 
     /* --- RPE 定时 --- */
@@ -256,6 +311,21 @@ export class Game {
         this.tipToast = { text: HEALTH_TIPS[this.tipIdx], until: this.simTime + 20 };
         this.tipNextAt = this.simTime + 20;
       }
+    }
+
+    /* --- 背景远眺巡游：每 tourSec 缓变切一张其他风景（只换照片层，安全缓变不闪） --- */
+    if (this.simTime >= this.tourNextAt) {
+      this.tourNextAt = this.simTime + CONFIG.scene.tourSec;
+      const cur = SCENES[this.journey.sceneIndex];
+      const pool = SCENES.filter(s => s !== cur && s !== this.tourFade?.to && s._photoImg);
+      if (pool.length && !this.celebrate && !this.transition) {
+        this.tourFade = { from: this.displayScene, to: pool[Math.floor(Math.random() * pool.length)], startedAt: this.simTime };
+      }
+      ensureScenePhoto(SCENES[Math.floor(Math.random() * SCENES.length)]); // 慢慢扩大已加载池
+    }
+    if (this.tourFade && this.simTime - this.tourFade.startedAt >= CONFIG.scene.tourFadeSec) {
+      this.displayScene = this.tourFade.to;
+      this.tourFade = null;
     }
 
     /* --- 心率安全 --- */
@@ -441,17 +511,39 @@ export class Game {
       default: y = reach.shoulderY - reach.torso * 0.02; x = rand(xmin, xmax);
     }
     y = Math.max(0.06, Math.min(0.82, y));
+    // 本站最后一枚印章：金框脉冲标记 + 专属预告音（集齐即触发盖章仪式）
+    const isFinal = kind === 'stamp'
+      && this.journey.stampsInScene === this.stampCardNeed - 1
+      && !this.celebrate
+      && !this.items.some(i => i.final);
+    if (isFinal) {
+      this.audio.finalStamp();
+      this.audio.speak(`这是${SCENES[this.journey.sceneIndex].name}的最后一枚印章，抬手摘下它！`);
+    }
     this.items.push({
       kind, tier, x, y,
       age: 0, life: G.itemLifeSec,
       seed: Math.random() * 10,
+      final: isFinal,
     });
   }
 
   _catch(it, bs) {
     this.itemsCaught++;
+    // 连击：8 秒内连续摘到 → 五声音阶逐级上行（只奖励手眼协调，与运动强度无关）
+    this.combo = (this.simTime - this.lastCatchAt <= 8) ? this.combo + 1 : 1;
+    this.lastCatchAt = this.simTime;
+    if (this.combo >= 2) {
+      this.audio.combo(this.combo);
+      this.effects.push({ x: it.x, y: Math.max(0.08, it.y - 0.07), age: 0, dur: 0.9, kind: 'combo', n: this.combo });
+      if (this.combo >= 4 && this.simTime - this.comboPraiseAt > 30) {
+        this.comboPraiseAt = this.simTime;
+        this.audio.speak(pickLine(COMBO_LINES));
+      }
+    } else {
+      this.audio.catchItem();
+    }
     this.effects.push({ x: it.x, y: it.y, age: 0, dur: 0.8, kind: it.kind });
-    this.audio.catchItem();
     switch (it.kind) {
       case 'stamp':
         this._addStamp(false);
@@ -488,14 +580,20 @@ export class Game {
   _finishCelebrate() {
     const c = this.celebrate;
     this.celebrate = null;
+    this.scenesCompleted++;
     this.journey.stampsInScene = 0;
     this.journey.sceneIndex++;
     if (this.journey.sceneIndex >= SCENES.length) {
       this.journey.sceneIndex = 0;
       this.journey.rounds++;
     }
+    preloadScenePhotosAround(this.journey.sceneIndex); // 新一站+下一站照片预取
     const next = SCENES[this.journey.sceneIndex];
     this.sceneNames.push(next.name);
+    // 换站：背景巡游回到新站，重新计时
+    this.displayScene = next;
+    this.tourFade = null;
+    this.tourNextAt = this.simTime + CONFIG.scene.tourSec;
     this.transition = {
       from: c.scene, to: next,
       startedAt: this.simTime, until: this.simTime + 2.5,
@@ -556,6 +654,8 @@ export class Game {
       hr: bpm,
       hrZone: this.hrZone,
       hrManual: this.hr.manual,
+      rpePrimary: this.rpePrimary,   // 无设备/β阻滞剂 → RPE 主控（HUD 显示用）
+      monitor: this.monitor,
       steps: this.stepsThisSession,
       distanceKm: this.sessionKm.toFixed(2),
       paused: this.paused,
@@ -598,8 +698,13 @@ export class Game {
 
     const scene = SCENES[this.journey.sceneIndex];
 
-    // 世界
-    drawWorld(ctx, W, H, scene, t, this.visDist);
+    // 世界（背景 = displayScene：当前站或"远眺"的其他风景；物件/印章字仍是当前站）
+    const bg = this.displayScene || scene;
+    drawWorld(ctx, W, H, bg, t, this.visDist);
+    if (this.tourFade) {
+      const p = Math.min(1, (this.simTime - this.tourFade.startedAt) / CONFIG.scene.tourFadeSec);
+      drawWorld(ctx, W, H, this.tourFade.to, t, this.visDist + 0.5, { alpha: p });
+    }
     if (this.transition) {
       const p = Math.min(1, (this.simTime - this.transition.startedAt) / (this.transition.until - this.transition.startedAt));
       drawWorld(ctx, W, H, this.transition.to, t, this.visDist + 0.5, { alpha: p });
@@ -688,9 +793,14 @@ export class Game {
 
   _drawSceneBanner(ctx, W) {
     const scene = SCENES[this.journey.sceneIndex];
+    // 背景若正"远眺"其他风景，横幅小字标注，避免患者混淆当前站点
+    const touring = this.tourFade ? this.tourFade.to
+      : (this.displayScene && this.displayScene !== scene ? this.displayScene : null);
     ctx.save();
     ctx.globalAlpha = 0.88;
-    const text = `${scene.name} · 第${this.journey.sceneIndex + 1}站`;
+    const text = touring
+      ? `${scene.name} · 第${this.journey.sceneIndex + 1}站 · 远眺${touring.name}`
+      : `${scene.name} · 第${this.journey.sceneIndex + 1}站`;
     ctx.font = `22px ${FONT_KAI}`;
     const w = ctx.measureText(text).width + 60;
     roundRect(ctx, W / 2 - w / 2, 14, w, 40, 20);
@@ -852,6 +962,18 @@ export class Game {
         ctx.font = `700 ${Math.round(s * 1.05)}px ${FONT_KAI}`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(SCENES[this.journey.sceneIndex].ch, 0, s * 0.06);
+        // 末印：金色脉冲虚线框 + "末印"角标
+        if (it.final) {
+          const pul = 1 + Math.sin(t * 4) * 0.05;
+          ctx.strokeStyle = '#ffd700';
+          ctx.lineWidth = s * 0.08;
+          ctx.setLineDash([s * 0.18, s * 0.11]);
+          ctx.strokeRect(-s * 0.88 * pul, -s * 0.88 * pul, s * 1.76 * pul, s * 1.76 * pul);
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#ffd700';
+          ctx.font = `700 ${Math.round(s * 0.34)}px ${FONT_KAI}`;
+          ctx.fillText('末印', 0, -s * 1.08 * pul);
+        }
         break;
       }
       case 'lantern': {
@@ -905,7 +1027,16 @@ export class Game {
       ctx.save();
       ctx.globalAlpha = 1 - p;
       const x = e.x * W, y = (e.y - p * 0.08) * H;
-      if (e.kind === 'goldstamp') {
+      if (e.kind === 'combo') {
+        // 连击浮字：字号随连击数微增，金色渐隐
+        ctx.fillStyle = '#ffd700';
+        ctx.strokeStyle = 'rgba(40,30,10,0.6)';
+        ctx.lineWidth = 3;
+        ctx.font = `700 ${16 + Math.min(10, e.n * 1.5)}px system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.strokeText(`连击 ×${e.n}`, x, y);
+        ctx.fillText(`连击 ×${e.n}`, x, y);
+      } else if (e.kind === 'goldstamp') {
         ctx.translate(x, y);
         const s = Math.min(W, H) * 0.12 * (1 + p * 0.6);
         ctx.fillStyle = '#ffd700';
@@ -1040,6 +1171,7 @@ export class Game {
 /* ---------------- 绘图工具 ---------------- */
 
 function rand(a, b) { return a + Math.random() * (b - a); }
+function pickLine(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 export function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();

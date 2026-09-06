@@ -120,17 +120,20 @@ export function lastSessionDate() {
 export function exportCSV() {
   const arr = getSessions();
   const cols = [
-    '日期', '结束方式', '场景', '姿势', '总时长秒', '热身秒', '主运动秒', '整理秒',
+    '日期', '结束方式', '场景', '监护方式', '姿势', '总时长秒', '热身秒', '主运动秒', '整理秒',
     '步数', '里程公里', '平均步频', '最高步频', '印章数', '物件数',
     '估算千卡', 'RPE记录', '心率均值', '心率峰值', '心率样本数',
     '自动暂停次数', '景点',
   ];
+  const MON_LABEL = { hr: '心率设备', manual: '手动脉搏', rpe: '无设备(RPE主控)' };
   const esc = v => {
     const s = String(v ?? '');
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
   const rows = arr.map(s => [
-    s.date, s.endedBy, s.setting === 'clinic' ? '院内监护' : '居家', s.mode, s.durationSec.total, s.durationSec.warmup, s.durationSec.main, s.durationSec.cooldown,
+    s.date, s.endedBy, s.setting === 'clinic' ? '院内监护' : '居家',
+    MON_LABEL[s.monitor] || '未记录', s.mode,
+    s.durationSec.total, s.durationSec.warmup, s.durationSec.main, s.durationSec.cooldown,
     s.steps, s.distanceKm.toFixed(2), s.avgCadence, s.maxCadence, s.stampsEarned, s.itemsCaught,
     s.kcal.toFixed(1),
     (s.rpeSamples || []).map(r => `${Math.round(r.t / 60)}分:${r.v}`).join(' '),

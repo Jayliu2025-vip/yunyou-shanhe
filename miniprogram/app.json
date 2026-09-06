@@ -1,0 +1,13 @@
+{
+  "pages": [
+    "pages/index/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "云游山河",
+    "navigationBarBackgroundColor": "#f6f1e7",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f6f1e7"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

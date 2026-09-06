@@ -8,15 +8,17 @@ import { AudioCoach } from './audio.js';
 import { HRMonitor } from './hr.js';
 import { BodyInput } from './pose.js';
 import { Game } from './game.js';
-import { SCENES, loadScenePhotos } from './scenes.js';
+import { SCENES, preloadScenePhotosAround } from './scenes.js';
 import * as store from './storage.js';
 
 const $ = (id) => document.getElementById(id);
 const QUICK = new URLSearchParams(location.search).has('quick'); // ?quick=1 快速体验（演示/测试）
 const IS_MOBILE = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+// 微信内打开：XWeb/WKWebView 通常无法授权摄像头 → 引导到系统浏览器（?wechat=1 可强制触发，便于测试）
+const IN_WECHAT = /MicroMessenger/i.test(navigator.userAgent) || new URLSearchParams(location.search).has('wechat');
 
-// 预加载景点实景照片（失败自动回退程序化场景）
-loadScenePhotos();
+// 预加载第 1、2 站实景照片（其余按需；缺图自动回退程序化场景）
+preloadScenePhotosAround(0);
 
 /* ---------------- 全局状态 ---------------- */
 
@@ -81,6 +83,7 @@ function renderSetup() {
   $('ck-auto').checked = !!settings.autoWalkDemo;
   $('row-auto').classList.add('hidden');
   updateHrZoneText();
+  updateMonitorHint();
   updateCamStatus(bodyMode === 'camera' ? '已就绪 ✓' : '未开启');
 }
 
@@ -122,6 +125,24 @@ function updateHrZoneText() {
 function getSettingMode() {
   const r = document.querySelector('input[name="setting"]:checked');
   return r ? r.value : 'home';
+}
+
+/* 准备页：当前强度监护方式提示（无设备安全模式的一等公民入口） */
+function updateMonitorHint() {
+  const el = $('monitor-hint');
+  if (!el) return;
+  const live = hr.connected && !hr.manual;
+  const beta = $('ck-beta').checked;
+  if (live && !beta) {
+    el.innerHTML = '当前：已连接心率设备 —— 心率监护 + RPE 双保险。';
+  } else if (live && beta) {
+    el.innerHTML = '当前：已连接心率设备，但因 β 受体阻滞剂，仍以<b>疲劳感觉（RPE）</b>为主控。';
+  } else if (hr.manual) {
+    el.innerHTML = '当前：手动脉搏（单次参考值）—— 强度以<b>疲劳自评 RPE</b>为主，每 3 分钟询问一次。';
+  } else {
+    el.innerHTML = '当前：<b>未连接心率设备</b> —— 强度以<b>疲劳自评 + 说话测试 + 症状</b>监护，'
+      + '每 3 分钟询问一次（符合 2026 ESC 心脏康复指南与《中国心血管疾病患者居家康复专家共识》）。';
+  }
 }
 
 async function initCameraInSetup() {
@@ -209,6 +230,15 @@ async function startSession() {
     plan.rpePromptIntervalSec = CONFIG.medical.clinic.rpePromptIntervalSec;
   }
 
+  // 监护方式（无设备安全模式，依据 2026 ESC 心脏康复指南 + 中国居家康复共识）：
+  // 蓝牙/研究设备实时心率 → 'hr'；手动脉搏 → 'manual'；未连接 → 'rpe'
+  // 非实时心率时 RPE 为主控，询问间隔收紧至 noDevice.rpePromptIntervalSec（180s）
+  const liveHr = hr.connected && !hr.manual;
+  plan.monitor = liveHr ? 'hr' : (hr.manual ? 'manual' : 'rpe');
+  if (plan.monitor !== 'hr') {
+    plan.rpePromptIntervalSec = CONFIG.medical.noDevice.rpePromptIntervalSec;
+  }
+
   // 手机：屏幕常亮（防锻炼中途锁屏）+ 提示横屏
   if (IS_MOBILE && navigator.wakeLock) {
     try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* 忽略 */ }
@@ -240,12 +270,21 @@ async function startSession() {
 
 /* ---------------- 游戏事件 ---------------- */
 
+/* RPE 自评弹窗（定时询问与 HUD 快捷按钮共用）：RPE 主控时附说话测试提示 */
+function openRpeDialog() {
+  const rp = !!(game && game.rpePrimary);
+  $('rpe-talktest').classList.toggle('hidden', !rp);
+  $('rpe-overlay').classList.remove('hidden');
+  audio.speak(rp
+    ? '现在感觉怎么样？记住，能连贯说话、但唱不了歌，就是合适的强度。请如实选择。'
+    : '现在感觉怎么样？请如实选择您的疲劳程度。', true);
+  audio.vibrate(30);
+}
+
 function onGameEvent(ev) {
   switch (ev.type) {
     case 'rpe':
-      $('rpe-overlay').classList.remove('hidden');
-      audio.speak('现在感觉怎么样？请如实选择您的疲劳程度。', true);
-      audio.vibrate(30);
+      openRpeDialog();
       break;
     case 'scene-intro':
       showSceneIntro(ev.scene, ev.auto);
@@ -349,7 +388,10 @@ function updateHud(h) {
   $('hud-cadence').textContent = h.cadence;
   $('hud-tempo').textContent = h.tempo;
   const chip = $('hud-hr-chip');
-  $('hud-hr').textContent = h.hr || '--';
+  $('hud-hr').textContent = h.hr || (h.rpePrimary ? 'RPE主控' : '--');
+  chip.title = !h.hr
+    ? '未连接心率设备：以疲劳自评(RPE)+说话测试+症状监护强度'
+    : (h.hrManual ? '手动脉搏（单次参考值），以 RPE 为主控' : '实时心率');
   chip.classList.toggle('zone-high', !!h.hr && !h.hrManual && h.hrZone && h.hr > h.hrZone.high);
   chip.classList.toggle('zone-ok', !!h.hr && !h.hrManual && h.hrZone && h.hr >= h.hrZone.low && h.hr <= h.hrZone.high);
 }
@@ -374,6 +416,12 @@ function handleSessionEnd(session, updatedJourney) {
     audio.speak('今天的部分已经记录下来了，好好休息，明天继续。', true);
   }
   $('summary-title').textContent = done ? '今日旅程完成！' : '今日旅程已记录';
+  // 今日称号（趣味反馈：按完成度与出勤给称号，与运动强度无关，不诱导加练）
+  const fullScene = (session.scenesCompleted > 0) || session.stampsEarned >= CONFIG.game.stampCardNeed;
+  $('sum-award').textContent = done
+    ? (fullScene ? '🏅 山河行者 · 集齐一整站' : '🥾 健步旅人')
+    : (fullScene ? '🏅 山河行者 · 集齐一整站'
+      : session.steps >= 300 ? '🌿 小憩游人 · 明天继续' : '🌱 明日再会');
   const st = store.streakInfo();
   $('summary-sub').textContent = done
     ? `连续打卡 ${st.current} 天 · 走的每一步，都算数。`
@@ -403,7 +451,11 @@ function handleSessionEnd(session, updatedJourney) {
     d.push(`平均心率 <b>${session.hrAvg}</b>，峰值 <b>${session.hrMax}</b> 次/分（目标 ${z.low}~${z.high}）`);
     if (session.autoPauses) d.push(`心率自动暂停 <b>${session.autoPauses}</b> 次`);
   } else {
-    d.push('心率：本次未连接心率带（以疲劳感觉控制强度）');
+    const monText = {
+      rpe: '本次未连接心率设备 —— 按指南以 <b>RPE + 说话测试 + 症状</b>主控（每 3 分钟询问）',
+      manual: '手动脉搏模式 —— 以疲劳自评（RPE）为主控',
+    };
+    d.push('心率：' + (monText[session.monitor] || '本次未连接心率带（以疲劳感觉控制强度）'));
   }
   if (session.snapshot.betaBlocker) d.push('服用β受体阻滞剂：已按 RPE 为主控强度');
   d.push('到访景点：' + session.sceneNames.join(' → '));
@@ -491,12 +543,34 @@ function renderPassport() {
 function renderSettings() {
   $('set-sound').checked = settings.sound;
   $('set-speech').checked = settings.speech;
+  fillVoiceSelect();
   const cfg = settings.cfg || {};
   $('cfg-int-lo').value = CONFIG.medical.intensityLow;
   $('cfg-int-hi').value = CONFIG.medical.intensityHigh;
   $('cfg-rpe-int').value = CONFIG.medical.rpePromptIntervalSec;
   $('cfg-tempo').value = CONFIG.tempo.start;
   updateCfgHint();
+}
+
+/* 教练声音下拉：自动 + 设备可用中文语音按性别分组（男女患者可选） */
+function fillVoiceSelect() {
+  const sel = $('set-voice');
+  const voices = audio.listZhVoices();
+  const opts = ['<option value="">自动（推荐）</option>'];
+  if (!voices.length) {
+    opts.push('<option value="" disabled>正在获取设备声音列表…</option>');
+  } else {
+    const byGender = { female: '女声教练', male: '男声教练', unknown: '其他中文声音' };
+    for (const g of ['female', 'male', 'unknown']) {
+      const group = voices.filter(v => v.gender === g);
+      if (!group.length) continue;
+      opts.push(`<optgroup label="${byGender[g]}">` + group.map(v =>
+        `<option value="${v.uri}">${v.name}</option>`).join('') + '</optgroup>');
+    }
+  }
+  sel.innerHTML = opts.join('');
+  sel.value = settings.voiceURI || '';
+  if (!sel.value && sel.selectedIndex === -1) sel.selectedIndex = 0;
 }
 
 function updateCfgHint() {
@@ -556,7 +630,7 @@ function bind() {
   $('btn-cam').onclick = initCameraInSetup;
   $('in-age').oninput = updateHrZoneText;
   $('in-resthr').oninput = updateHrZoneText;
-  $('ck-beta').onchange = updateHrZoneText;
+  $('ck-beta').onchange = () => { updateHrZoneText(); updateMonitorHint(); };
   document.querySelectorAll('input[name="setting"]').forEach(r => {
     r.onchange = updateHrZoneText;
   });
@@ -581,10 +655,12 @@ function bind() {
     $('hr-status').textContent = '请在弹出窗口中选择您的心率带…';
     const ok = await hr.connect();
     $('hr-status').textContent = ok ? `已连接 ${hr.deviceName} ✓` : '未连接';
+    updateMonitorHint();
   };
   $('in-hr-manual').onchange = () => {
     const v = parseInt($('in-hr-manual').value, 10);
     if (v > 0) { hr.setManual(v); $('hr-status').textContent = `手动心率：${hr.bpm} 次/分`; }
+    updateMonitorHint();
   };
 
   // 游戏按钮
@@ -622,7 +698,7 @@ function bind() {
   $('btn-rpe-quick').onclick = () => {
     if (!game || !game.running || game.paused) return;
     game.pause('rpe');
-    $('rpe-overlay').classList.remove('hidden');
+    openRpeDialog();
   };
   document.querySelectorAll('.rpe-btn').forEach(b => {
     b.onclick = () => {
@@ -658,6 +734,32 @@ function bind() {
   $('btn-settings-back').onclick = () => { renderHome(); showScreen('screen-home'); };
   $('set-sound').onchange = () => { settings.sound = $('set-sound').checked; store.saveSettings(settings); syncSoundBtn(); };
   $('set-speech').onchange = () => { settings.speech = $('set-speech').checked; store.saveSettings(settings); syncSoundBtn(); };
+  $('set-voice').onchange = () => {
+    const uri = $('set-voice').value;
+    settings.voiceURI = uri || null;
+    const chosen = uri ? audio.listZhVoices().find(v => v.uri === uri) : null;
+    settings.voiceMode = chosen ? chosen.gender : 'auto';
+    store.saveSettings(settings);
+    audio.refreshVoice();
+  };
+  $('btn-voice-test').onclick = () => {
+    audio.ensure();
+    audio.speak('您好，我是您的康复教练。今天也一起，稳稳地走。', true);
+  };
+  // 音效试听：依次播放 摘取(泡泡)→连击2/3/4(变调上行)→里程碑→末印，先给素材加载留半秒
+  $('btn-sfx-test').onclick = () => {
+    audio.ensure();
+    audio.speak('现在试听新音效：摘取、连击、里程碑、末印预告。', true);
+    const seq = [
+      [900, () => audio.catchItem()],
+      [1400, () => audio.combo(2)],
+      [1800, () => audio.combo(3)],
+      [2200, () => audio.combo(4)],
+      [2700, () => audio.milestone()],
+      [3300, () => audio.finalStamp()],
+    ];
+    seq.forEach(([t, fn]) => setTimeout(fn, t));
+  };
   ['cfg-int-lo', 'cfg-int-hi', 'cfg-rpe-int', 'cfg-tempo'].forEach(id => {
     $(id).onchange = saveCfgFromInputs;
   });
@@ -694,6 +796,7 @@ function bind() {
   hr.onStatus = (s) => {
     if (s === 'connected') $('hr-status').textContent = `已连接 ${hr.deviceName} ✓`;
     else if (s === 'disconnected') $('hr-status').textContent = '设备已断开';
+    updateMonitorHint();
   };
 
   // 演示模式触屏踏步（手机演示）
@@ -703,6 +806,16 @@ function bind() {
   $('btn-rotate-continue').onclick = () => {
     rotateDismissed = true;
     $('rotate-overlay').classList.add('hidden');
+  };
+
+  // 微信引导"先体验"：进入准备页并预勾演示模式+自动行走（无需摄像头即可完整体验）
+  $('btn-wechat-demo').onclick = () => {
+    sessionStorage.setItem('yysn_wechat_hint_closed', '1');
+    $('wechat-overlay').classList.add('hidden');
+    $('btn-start').onclick();
+    $('ck-demo').checked = true;
+    $('row-auto').classList.remove('hidden');
+    $('ck-auto').checked = true;
   };
 
   // 游戏内声音开关（音效 + 语音一体切换）
@@ -734,3 +847,12 @@ bind();
 renderHome();
 audio.bindUnlock();   // 手机端：首次触摸即解锁音效与语音
 if (QUICK) console.log('[云游山河] 快速体验模式：热身20s / 主运动90s / 整理20s');
+// 语音列表异步就绪时，若设置页开着则刷新"教练声音"下拉
+audio.onVoicesReady = () => {
+  if (!$('screen-settings').classList.contains('hidden')) fillVoiceSelect();
+};
+
+// 微信内打开引导：每次会话只提示一次；可选择先以演示模式体验
+if (IN_WECHAT && !sessionStorage.getItem('yysn_wechat_hint_closed')) {
+  $('wechat-overlay').classList.remove('hidden');
+}

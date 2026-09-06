@@ -1,0 +1,19 @@
+{
+  "description": "云游山河 · 心脏康复体感游戏（web-view 壳）",
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true
+  },
+  "compileType": "miniprogram",
+  "libVersion": "3.4.10",
+  "appid": "touristappid",
+  "projectname": "yunyou-shanhe",
+  "condition": {}
+}
