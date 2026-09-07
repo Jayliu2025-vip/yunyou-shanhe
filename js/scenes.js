@@ -306,6 +306,7 @@ export const SCENES = [
   {
     id: 'xihu', name: '杭州西湖', ch: '湖', sub: '欲把西湖比西子，淡妆浓抹总相宜',
     photo: 'assets/photos/xihu.jpg',
+    photos: ['assets/photos/xihu-2.jpg', 'assets/photos/xihu-3.jpg', 'assets/photos/xihu-4.jpg'],
     intro: '西湖三面环山、一面临城，"西湖十景"名扬天下。漫步苏堤，柳浪闻莺，远眺雷峰塔，尽是江南的温柔。',
     tips: ['苏堤由苏东坡主持疏浚时所筑', '雷峰塔与《白蛇传》的传说', '2011年列入世界文化遗产'],
     sky: ['#bfe4f2', '#eef9f6'], sun: { x: 0.78, y: 0.2, r: 0.05, c: '#ffdda8', type: 'sun' },
@@ -318,6 +319,7 @@ export const SCENES = [
   {
     id: 'huangshan', name: '黄山云海', ch: '黄', sub: '五岳归来不看山，黄山归来不看岳',
     photo: 'assets/photos/huangshan.jpg',
+    photos: ['assets/photos/huangshan-2.jpg', 'assets/photos/huangshan-3.jpg', 'assets/photos/huangshan-4.jpg'],
     intro: '黄山以奇松、怪石、云海、温泉"四绝"著称。雨后初晴，云雾在群峰间翻涌如浪，峰峦若隐若现，宛如仙境。',
     tips: ['迎客松是安徽的标志', '徐霞客：登黄山，天下无山', '1990年列入世界文化与自然遗产'],
     sky: ['#c9d6e8', '#f2ede4'], sun: { x: 0.2, y: 0.16, r: 0.045, c: '#fff2d0', type: 'sun' },
@@ -329,6 +331,7 @@ export const SCENES = [
   {
     id: 'lijiang', name: '桂林漓江', ch: '漓', sub: '江作青罗带，山如碧玉簪',
     photo: 'assets/photos/lijiang.jpg',
+    photos: ['assets/photos/lijiang-2.jpg', 'assets/photos/lijiang-3.jpg', 'assets/photos/lijiang-4.jpg'],
     intro: '漓江蜿蜒于喀斯特峰林之间，江水清澈如镜。"江作青罗带，山如碧玉簪"，乘竹筏漂流最是惬意。',
     tips: ['二十元人民币背面取景地', '世界自然遗产喀斯特地貌', '渔火与鸬鹚是漓江一景'],
     sky: ['#cfe8f0', '#f6f4e8'], sun: { x: 0.82, y: 0.22, r: 0.05, c: '#ffe8c0', type: 'sun' },
@@ -341,6 +344,7 @@ export const SCENES = [
   {
     id: 'zhangjiajie', name: '张家界', ch: '界', sub: '扩大的盆景，缩小的仙境',
     photo: 'assets/photos/zhangjiajie.jpg',
+    photos: ['assets/photos/zhangjiajie-2.jpg', 'assets/photos/zhangjiajie-3.jpg', 'assets/photos/zhangjiajie-4.jpg'],
     intro: '三千奇峰拔地而起，宛如刀削斧劈的石柱森林。云雾缭绕时群峰似悬浮空中，电影《阿凡达》的"哈利路亚山"即取灵感于此。',
     tips: ['《阿凡达》悬浮山原型', '世界自然遗产武陵源', '拥有世界最长玻璃桥'],
     sky: ['#d4e2ee', '#f0f2ec'], sun: { x: 0.25, y: 0.18, r: 0.045, c: '#ffe8c8', type: 'sun' },
@@ -351,6 +355,7 @@ export const SCENES = [
   {
     id: 'erhai', name: '大理洱海', ch: '洱', sub: '苍山不墨千秋画，洱海无弦万古琴',
     photo: 'assets/photos/erhai.jpg',
+    photos: ['assets/photos/erhai-2.jpg', 'assets/photos/erhai-3.jpg', 'assets/photos/erhai-4.jpg'],
     intro: '洱海形如人耳，静卧于苍山脚下。湖光山色相映，白族渔村点缀其间，"风花雪月"中的"洱海月"最动人。',
     tips: ['崇圣寺三塔千年屹立', '白族扎染与三道茶', '环湖骑行胜地'],
     sky: ['#b8dff0', '#eaf6f0'], sun: { x: 0.7, y: 0.18, r: 0.05, c: '#ffdca8', type: 'sun' },
@@ -362,6 +367,7 @@ export const SCENES = [
   {
     id: 'dunhuang', name: '敦煌鸣沙山', ch: '煌', sub: '大漠孤烟直，长河落日圆',
     photo: 'assets/photos/dunhuang.jpg',
+    photos: ['assets/photos/dunhuang-2.jpg', 'assets/photos/dunhuang-3.jpg', 'assets/photos/dunhuang-4.jpg'],
     intro: '鸣沙山沙峰起伏，风吹沙响；山下月牙泉形如弯月，千年不涸。驼铃声声，仿佛重回丝绸之路。',
     tips: ['丝绸之路重镇', '莫高窟壁画艺术宝库', '月牙泉千年不涸之谜'],
     sky: ['#f2c898', '#f9eed6'], sun: { x: 0.5, y: 0.3, r: 0.09, c: '#ff9d4d', type: 'sun' },
@@ -372,6 +378,7 @@ export const SCENES = [
   {
     id: 'hulunbeir', name: '呼伦贝尔草原', ch: '原', sub: '天苍苍，野茫茫，风吹草低见牛羊',
     photo: 'assets/photos/hulunbeir.jpg',
+    photos: ['assets/photos/hulunbeir-2.jpg', 'assets/photos/hulunbeir-3.jpg', 'assets/photos/hulunbeir-4.jpg'],
     intro: '世界四大草原之一。蓝天白云下绿浪千里，牛羊如珠玑散落，蒙古包炊烟袅袅，正是"天苍苍，野茫茫"。',
     tips: ['世界四大草原之一', '那达慕大会与赛马摔跤', '额尔古纳湿地'],
     sky: ['#a8d4f0', '#e8f4d8'], sun: { x: 0.76, y: 0.2, r: 0.05, c: '#ffe0a8', type: 'sun' },
@@ -384,6 +391,7 @@ export const SCENES = [
   {
     id: 'greatwall', name: '万里长城', ch: '城', sub: '不到长城非好汉，屈指行程二万',
     photo: 'assets/photos/greatwall.jpg',
+    photos: ['assets/photos/greatwall-2.jpg', 'assets/photos/greatwall-3.jpg', 'assets/photos/greatwall-4.jpg'],
     intro: '长城横亘崇山峻岭，如巨龙盘踞。春秋战国始筑，明代重修，两千年间守护着农耕文明。',
     tips: ['世界文化遗产', '总长超过两万公里', '敌楼与烽火台的军事智慧'],
     sky: ['#d4e0ec', '#f4ecdc'], sun: { x: 0.22, y: 0.2, r: 0.05, c: '#ffd9a0', type: 'sun' },
@@ -394,6 +402,7 @@ export const SCENES = [
   {
     id: 'taishan', name: '泰山日出', ch: '泰', sub: '会当凌绝顶，一览众山小',
     photo: 'assets/photos/taishan.jpg',
+    photos: ['assets/photos/taishan-2.jpg', 'assets/photos/taishan-3.jpg', 'assets/photos/taishan-4.jpg'],
     intro: '五岳之首，历代帝王封禅之地。夜攀泰山观日出是无数人的心愿：云海翻腾处，红日跃出。',
     tips: ['五岳之首，帝王封禅', '旭日东升与云海玉盘', '十八盘千级石阶'],
     sky: ['#f4b888', '#fdeed0'], sun: { x: 0.5, y: 0.38, r: 0.11, c: '#ffb84d', type: 'sun', rise: true },
@@ -405,6 +414,7 @@ export const SCENES = [
   {
     id: 'gugong', name: '故宫', ch: '宫', sub: '一朝步入画卷，一日梦回千年',
     photo: 'assets/photos/gugong.jpg',
+    photos: ['assets/photos/gugong-2.jpg', 'assets/photos/gugong-3.jpg', 'assets/photos/gugong-4.jpg'],
     intro: '明清两代皇宫，世界现存规模最大的木结构宫殿群。红墙黄瓦，太和殿的飞檐在晨光中诉说六百年风云。',
     tips: ['太和殿俗称金銮殿', '世界五大宫殿之首', '1925年建为故宫博物院'],
     sky: ['#c8d8e8', '#f0e8e0'], sun: { x: 0.2, y: 0.16, r: 0.04, c: '#ffe8c8', type: 'sun' },
@@ -415,6 +425,7 @@ export const SCENES = [
   {
     id: 'qinghaihu', name: '青海湖', ch: '青', sub: '碧波荡漾千里目，油菜花开遍地金',
     photo: 'assets/photos/qinghaihu.jpg',
+    photos: ['assets/photos/qinghaihu-2.jpg', 'assets/photos/qinghaihu-3.jpg', 'assets/photos/qinghaihu-4.jpg'],
     intro: '中国最大的内陆咸水湖，高原蓝宝石。七月环湖油菜花金黄铺展，湖畔经幡飘扬，水鸟翔集。',
     tips: ['中国最大咸水湖', '环湖油菜花海', '鸟岛候鸟栖息地'],
     sky: ['#a8d8f0', '#e8f4f8'], sun: { x: 0.78, y: 0.18, r: 0.05, c: '#ffe0a8', type: 'sun' },
@@ -426,6 +437,7 @@ export const SCENES = [
   {
     id: 'potala', name: '布达拉宫', ch: '藏', sub: '住进布达拉宫，我是雪域最大的王',
     photo: 'assets/photos/potala.jpg',
+    photos: ['assets/photos/potala-2.jpg', 'assets/photos/potala-3.jpg', 'assets/photos/potala-4.jpg'],
     intro: '布达拉宫依红山而建，海拔3700米，白宫红殿层叠而上，金顶映日，已守望拉萨千年。',
     tips: ['世界海拔最高的宫殿', '松赞干布始建', '1994年列入世界遗产'],
     sky: ['#c8e0f0', '#f0ead8'], sun: { x: 0.24, y: 0.18, r: 0.05, c: '#fff0c8', type: 'sun' },
@@ -437,6 +449,7 @@ export const SCENES = [
   {
     id: 'wudang', name: '武当仙山', ch: '武', sub: '山不在高，有仙则名',
     photo: 'assets/photos/wudang.jpg',
+    photos: ['assets/photos/wudang-2.jpg', 'assets/photos/wudang-3.jpg', 'assets/photos/wudang-4.jpg'],
     intro: '武当山是道教圣地，明代皇家道观依山而建，金顶在云雾中时隐时现。相传张三丰在此悟创太极拳，以柔克刚、动静相生。',
     tips: ['1994年列入世界文化遗产', '金顶铜殿六百年不锈', '太极拳发源于此的传说'],
     sky: ['#c9dae4', '#f0ece0'], sun: { x: 0.76, y: 0.18, r: 0.05, c: '#ffe6b8', type: 'sun' },
@@ -469,9 +482,10 @@ export const HEALTH_TIPS = [
 
 /* ---------------- 实景照片（按需加载，手机流量/首屏优化） ---------------- */
 
-const photoState = new Map(); // scene.id -> 'loading' | 'ok' | 'fail'（防重复请求）
+const photoState = new Map(); // scene.id -> 'loading' | 'ok' | 'fail'（主图，防重复请求）
+const extraPhotosState = new Map(); // scene.id -> 'loading' | 'done'（本站附加图集，防重复请求）
 
-/** 按需加载单个景点照片（游戏"远眺巡游"与预取共用）；成功前 drawWorld 自动回退程序化水墨场景 */
+/** 按需加载单个景点主图（站内轮换与预取共用）；成功前 drawWorld 自动回退程序化水墨场景 */
 export function ensureScenePhoto(scene) {
   if (!scene || scene._photoImg || photoState.get(scene.id)) return;
   photoState.set(scene.id, 'loading');
@@ -484,20 +498,40 @@ export function ensureScenePhoto(scene) {
   img.src = scene.photo;
 }
 
-/** 预加载当前站与下一站：首屏只拉 2 张（约 300~400KB），而非全量 12 张（约 2.3MB） */
+/** 按需加载景点整套图集（主图 + photos[] 附加图，供站内轮换）；主图未就绪时先只拉主图 */
+export function ensureScenePhotos(scene) {
+  if (!scene) return;
+  if (!scene._photoImg) { ensureScenePhoto(scene); return; }
+  if (!scene.photos?.length || extraPhotosState.get(scene.id)) return;
+  extraPhotosState.set(scene.id, 'loading');
+  scene._photoImgs = [scene._photoImg];
+  let left = scene.photos.length;
+  for (const src of scene.photos) {
+    const img = new Image();
+    img.onload = () => { scene._photoImgs.push(img); if (--left === 0) extraPhotosState.set(scene.id, 'done'); };
+    img.onerror = () => {
+      console.warn('[云游山河] 站内图集加载失败：', src);
+      if (--left === 0) extraPhotosState.set(scene.id, 'done');
+    };
+    img.src = src;
+  }
+}
+
+/** 预加载：当前站整套图集（站内轮换用）+ 下一站主图（过场用）；首屏只拉 2~5 张，而非全量图集 */
 export function preloadScenePhotosAround(index) {
-  ensureScenePhoto(SCENES[((index % SCENES.length) + SCENES.length) % SCENES.length]);
+  ensureScenePhotos(SCENES[((index % SCENES.length) + SCENES.length) % SCENES.length]);
   ensureScenePhoto(SCENES[(index + 1) % SCENES.length]);
 }
 
 /** 实景照片世界：Ken Burns 缓动 + 轻雾 + 地面道路 */
 function drawPhotoWorld(ctx, W, H, scene, t, distKm, opts = {}) {
   const alpha = opts.alpha ?? 1;
-  const img = scene._photoImg;
+  const img = opts.photo || scene._photoImg;
   ctx.save();
   ctx.globalAlpha = alpha;
-  // Ken Burns：缓慢呼吸缩放与平移，随时间产生"行进中的风景"感
-  const seed = scene.id.length;
+  // Ken Burns：缓慢呼吸缩放与平移，随时间产生"行进中的风景"感；
+  // 种子混入图集序号 → 同站不同照片的缓动相位错开，轮换时不显机械
+  const seed = scene.id.length + (scene._photoImgs ? Math.max(0, scene._photoImgs.indexOf(img)) : 0);
   const zoom = 1.07 + 0.05 * Math.sin(t * 0.04 + seed);
   const panX = Math.sin(t * 0.023 + seed * 2) * 0.014;
   const scale = Math.max(W / img.width, H / img.height) * zoom;

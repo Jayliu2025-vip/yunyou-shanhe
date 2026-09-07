@@ -1,5 +1,5 @@
 /**
- * 云游山河 Service Worker（v1.3.3 离线缓存）
+ * 云游山河 Service Worker（v1.3.4 离线缓存）
  *
  * 目的：手机（居家康复主力设备）二次打开秒开、弱网/断网仍可完整训练
  * （MediaPipe 模型与 WASM 均为本仓库本地文件，缓存后完全离线可用）。
@@ -12,7 +12,7 @@
  *
  * 更新版本号（与 CHANGELOG 同步）即可让旧缓存整体失效。
  */
-const VERSION = 'yysn-v1.3.3';
+const VERSION = 'yysn-v1.3.4';
 const CORE = [
   './', './index.html', './manifest.json',
   './css/style.css',

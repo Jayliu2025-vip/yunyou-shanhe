@@ -6,7 +6,7 @@
  * - 集章系统：每景点集齐 12 枚印章 → 盖章仪式 → 解锁下一景点
  */
 import { CONFIG, targetHrZone } from './config.js';
-import { SCENES, drawWorld, HEALTH_TIPS, preloadScenePhotosAround, ensureScenePhoto, cachedGrad } from './scenes.js';
+import { SCENES, drawWorld, HEALTH_TIPS, preloadScenePhotosAround, ensureScenePhotos, cachedGrad } from './scenes.js';
 
 const G = CONFIG.game;
 const T = CONFIG.tempo;
@@ -105,10 +105,10 @@ export class Game {
     this.itemsCaught = 0;
     this.sessionKm = 0;
     this.scenesCompleted = 0;   // 本次完成盖章仪式（集齐一站）的次数
-    // 背景远眺巡游（只换背景照片层，当前景点/印章语义不变）
-    this.displayScene = null;   // 当前显示的背景场景
-    this.tourFade = null;       // {from, to, startedAt} 淡切过渡
-    this.tourNextAt = Infinity;
+    // 站内风景轮换（v1.3.4：只在本景点的多张实拍图之间淡切；跨景点"远眺巡游"已移除，
+    // 避免"杭州站看到别处风景"的语义混淆——印章/物件/玩法语义始终属于当前站）
+    this.photoFade = null;      // {to, startedAt} 站内照片淡切过渡（from = scene._photoImg）
+    this.photoNextAt = Infinity;
     // 趣味反馈状态（v1.2：连击/里程碑/末印预告）
     this.combo = 0;
     this.lastCatchAt = -99;
@@ -150,9 +150,8 @@ export class Game {
     this.blockNextAt = this.plan.strengthBlocks
       ? this.plan.warmupSec + (this.plan.quick ? 5 : EX.firstBlockAfterSec)
       : Infinity;
-    // 背景巡游：15 秒后开始"远眺"其他风景（暂停时 simTime 停走，巡游同步暂停）
-    this.displayScene = SCENES[this.journey.sceneIndex];
-    this.tourNextAt = CONFIG.scene.tourSec > 0 ? CONFIG.scene.tourSec : Infinity;
+    // 站内轮换：15 秒后开始在本景点多张图间缓变淡切（暂停时 simTime 停走，轮换同步暂停）
+    this.photoNextAt = CONFIG.scene.photoRotateSec > 0 ? CONFIG.scene.photoRotateSec : Infinity;
     this._showPhaseTitle('热身开始', '跟着脚印轻轻踏步，活动开身体');
     // 无设备模式开场告知安全主控方式（说话测试口诀，CSANZ 2023 / 中国居家康复共识口径）
     const intro = this.monitor === 'rpe'
@@ -358,19 +357,25 @@ export class Game {
       }
     }
 
-    /* --- 背景远眺巡游：每 tourSec 缓变切一张其他风景（只换照片层，安全缓变不闪） --- */
-    if (this.simTime >= this.tourNextAt) {
-      this.tourNextAt = this.simTime + CONFIG.scene.tourSec;
-      const cur = SCENES[this.journey.sceneIndex];
-      const pool = SCENES.filter(s => s !== cur && s !== this.tourFade?.to && s._photoImg);
-      if (pool.length && !this.celebrate && !this.transition) {
-        this.tourFade = { from: this.displayScene, to: pool[Math.floor(Math.random() * pool.length)], startedAt: this.simTime };
+    /* --- 站内风景轮换：每 photoRotateSec 在本景点的多张实拍图间缓变淡切（不跨地区，安全缓变不闪） --- */
+    const curScene = SCENES[this.journey.sceneIndex];
+    if (CONFIG.scene.photoRotateSec > 0) ensureScenePhotos(curScene); // 主图就绪后幂等补齐本站图集
+    if (this.simTime >= this.photoNextAt) {
+      const imgs = curScene._photoImgs;
+      const pool = imgs && imgs.length > 1
+        ? imgs.filter(im => im !== curScene._photoImg && im !== this.photoFade?.to)
+        : null;
+      if (pool && pool.length && !this.celebrate && !this.transition) {
+        this.photoNextAt = this.simTime + CONFIG.scene.photoRotateSec;
+        this.photoFade = { to: pool[Math.floor(Math.random() * pool.length)], startedAt: this.simTime };
+      } else if (!pool || !pool.length) {
+        // 图集未就绪或该站只有一张图：稍后再试（就绪即轮换，不空转）
+        this.photoNextAt = this.simTime + CONFIG.scene.photoRotateSec;
       }
-      ensureScenePhoto(SCENES[Math.floor(Math.random() * SCENES.length)]); // 慢慢扩大已加载池
     }
-    if (this.tourFade && this.simTime - this.tourFade.startedAt >= CONFIG.scene.tourFadeSec) {
-      this.displayScene = this.tourFade.to;
-      this.tourFade = null;
+    if (this.photoFade && this.simTime - this.photoFade.startedAt >= CONFIG.scene.photoFadeSec) {
+      curScene._photoImg = this.photoFade.to;
+      this.photoFade = null;
     }
 
     /* --- 心率安全 --- */
@@ -733,9 +738,8 @@ export class Game {
     const next = SCENES[this.journey.sceneIndex];
     this.sceneNames.push(next.name);
     // 换站：背景巡游回到新站，重新计时
-    this.displayScene = next;
-    this.tourFade = null;
-    this.tourNextAt = this.simTime + CONFIG.scene.tourSec;
+    this.photoFade = null;
+    this.photoNextAt = this.simTime + (CONFIG.scene.photoRotateSec > 0 ? CONFIG.scene.photoRotateSec : Infinity);
     this.transition = {
       from: c.scene, to: next,
       startedAt: this.simTime, until: this.simTime + 2.5,
@@ -849,12 +853,11 @@ export class Game {
 
     const scene = SCENES[this.journey.sceneIndex];
 
-    // 世界（背景 = displayScene：当前站或"远眺"的其他风景；物件/印章字仍是当前站）
-    const bg = this.displayScene || scene;
-    drawWorld(ctx, W, H, bg, t, this.visDist);
-    if (this.tourFade) {
-      const p = Math.min(1, (this.simTime - this.tourFade.startedAt) / CONFIG.scene.tourFadeSec);
-      drawWorld(ctx, W, H, this.tourFade.to, t, this.visDist + 0.5, { alpha: p });
+    // 世界（背景 = 当前站；站内多图轮换与跨站过渡分别叠加淡入层；物件/印章字仍是当前站）
+    drawWorld(ctx, W, H, scene, t, this.visDist);
+    if (this.photoFade) {
+      const p = Math.min(1, (this.simTime - this.photoFade.startedAt) / CONFIG.scene.photoFadeSec);
+      drawWorld(ctx, W, H, scene, t, this.visDist + 0.5, { alpha: p, photo: this.photoFade.to });
     }
     if (this.transition) {
       const p = Math.min(1, (this.simTime - this.transition.startedAt) / (this.transition.until - this.transition.startedAt));
@@ -953,14 +956,9 @@ export class Game {
 
   _drawSceneBanner(ctx, W) {
     const scene = SCENES[this.journey.sceneIndex];
-    // 背景若正"远眺"其他风景，横幅小字标注，避免患者混淆当前站点
-    const touring = this.tourFade ? this.tourFade.to
-      : (this.displayScene && this.displayScene !== scene ? this.displayScene : null);
     ctx.save();
     ctx.globalAlpha = 0.88;
-    const text = touring
-      ? `${scene.name} · 第${this.journey.sceneIndex + 1}站 · 远眺${touring.name}`
-      : `${scene.name} · 第${this.journey.sceneIndex + 1}站`;
+    const text = `${scene.name} · 第${this.journey.sceneIndex + 1}站`;
     ctx.font = `22px ${FONT_KAI}`;
     const w = ctx.measureText(text).width + 60;
     // y=70：置于 DOM 顶栏（HUD，高约 66 CSS px）下方，避免与"剩余 mm:ss"倒计时重叠
