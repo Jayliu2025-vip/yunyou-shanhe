@@ -14,6 +14,138 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<!-- 开源线性图标：Lucide（ISC License）内联 sprite，stroke 跟随 currentColor 以融入墨色/朱砂主题 -->
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+  <path d="M7 11V7a5 5 0 0 1 10 0v4" /></symbol>
+
+  <symbol id="i-alert-triangle" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+  <path d="M12 9v4" />
+  <path d="M12 17h.01" /></symbol>
+  <symbol id="i-angry" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" />
+  <path d="M16 16s-1.5-2-4-2-4 2-4 2" />
+  <path d="M7.5 8 10 9" />
+  <path d="m14 9 2.5-1" />
+  <path d="M9 10h.01" />
+  <path d="M15 10h.01" /></symbol>
+  <symbol id="i-annoyed" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" />
+  <path d="M8 15h8" />
+  <path d="M8 9h2" />
+  <path d="M14 9h2" /></symbol>
+  <symbol id="i-armchair" viewBox="0 0 24 24"><path d="M19 9V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3" />
+  <path d="M3 16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z" />
+  <path d="M5 18v2" />
+  <path d="M19 18v2" /></symbol>
+  <symbol id="i-audio-lines" viewBox="0 0 24 24"><path d="M2 10v3" />
+  <path d="M6 6v11" />
+  <path d="M10 3v18" />
+  <path d="M14 8v7" />
+  <path d="M18 5v13" />
+  <path d="M22 10v3" /></symbol>
+  <symbol id="i-battery-low" viewBox="0 0 24 24"><path d="M22 14v-4" />
+  <path d="M6 14v-4" />
+  <rect x="2" y="6" width="16" height="12" rx="2" /></symbol>
+  <symbol id="i-book-open" viewBox="0 0 24 24"><path d="M12 7v14" />
+  <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></symbol>
+  <symbol id="i-compass" viewBox="0 0 24 24"><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" />
+  <circle cx="12" cy="12" r="10" /></symbol>
+  <symbol id="i-dumbbell" viewBox="0 0 24 24"><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z" />
+  <path d="m2.5 21.5 1.4-1.4" />
+  <path d="m20.1 3.9 1.4-1.4" />
+  <path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z" />
+  <path d="m9.6 14.4 4.8-4.8" /></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528" /></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></symbol>
+  <symbol id="i-footprints" viewBox="0 0 24 24"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z" />
+  <path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z" />
+  <path d="M16 17h4" />
+  <path d="M4 13h4" /></symbol>
+  <symbol id="i-frown" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" />
+  <path d="M16 16s-1.5-2-4-2-4 2-4 2" />
+  <line x1="9" x2="9.01" y1="9" y2="9" />
+  <line x1="15" x2="15.01" y1="9" y2="9" /></symbol>
+  <symbol id="i-heart-pulse" viewBox="0 0 24 24"><path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" />
+  <path d="M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27" /></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" /></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" />
+  <path d="M12 16v-4" />
+  <path d="M12 8h.01" /></symbol>
+  <symbol id="i-laugh" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" />
+  <path d="M18 13a6 6 0 0 1-6 5 6 6 0 0 1-6-5h12Z" />
+  <line x1="9" x2="9.01" y1="9" y2="9" />
+  <line x1="15" x2="15.01" y1="9" y2="9" /></symbol>
+  <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+  <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" /></symbol>
+  <symbol id="i-lightbulb" viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+  <path d="M9 18h6" />
+  <path d="M10 22h4" /></symbol>
+  <symbol id="i-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+  <circle cx="12" cy="10" r="3" /></symbol>
+  <symbol id="i-medal" viewBox="0 0 24 24"><path d="M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .14 2.2L16.79 15" />
+  <path d="M11 12 5.12 2.2" />
+  <path d="m13 12 5.88-9.8" />
+  <path d="M8 7h8" />
+  <circle cx="12" cy="17" r="5" />
+  <path d="M12 18v-2h-.5" /></symbol>
+  <symbol id="i-meh" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" />
+  <line x1="8" x2="16" y1="15" y2="15" />
+  <line x1="9" x2="9.01" y1="9" y2="9" />
+  <line x1="15" x2="15.01" y1="9" y2="9" /></symbol>
+  <symbol id="i-message-circle" viewBox="0 0 24 24"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /></symbol>
+  <symbol id="i-mountain-snow" viewBox="0 0 24 24"><path d="m8 3 4 8 5-5 5 15H2L8 3z" />
+  <path d="M4.14 15.08c2.62-1.57 5.24-1.43 7.86.42 2.74 1.94 5.49 2 8.23.19" /></symbol>
+  <symbol id="i-mountain" viewBox="0 0 24 24"><path d="m8 3 4 8 5-5 5 15H2L8 3z" /></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="3" width="5" height="18" rx="1" />
+  <rect x="5" y="3" width="5" height="18" rx="1" /></symbol>
+  <symbol id="i-rotate-cw" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+  <path d="M21 3v5h-5" /></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" />
+  <circle cx="12" cy="12" r="3" /></symbol>
+  <symbol id="i-smartphone" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+  <path d="M12 18h.01" /></symbol>
+  <symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" />
+  <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+  <line x1="9" x2="9.01" y1="9" y2="9" />
+  <line x1="15" x2="15.01" y1="9" y2="9" /></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
+  <path d="M20 2v4" />
+  <path d="M22 4h-4" />
+  <circle cx="4" cy="20" r="2" /></symbol>
+  <symbol id="i-sprout" viewBox="0 0 24 24"><path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+  <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+  <path d="M5 21h14" /></symbol>
+  <symbol id="i-square" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /></symbol>
+  <symbol id="i-stamp" viewBox="0 0 24 24"><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13" />
+  <path d="M20 15.5a2.5 2.5 0 0 0-2.5-2.5h-11A2.5 2.5 0 0 0 4 15.5V17a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1z" />
+  <path d="M5 22h14" /></symbol>
+  <symbol id="i-timer" viewBox="0 0 24 24"><line x1="10" x2="14" y1="2" y2="2" />
+  <line x1="12" x2="15" y1="14" y2="11" />
+  <circle cx="12" cy="14" r="8" /></symbol>
+  <symbol id="i-trees" viewBox="0 0 24 24"><path d="M10 10v.2A3 3 0 0 1 8.9 16H5a3 3 0 0 1-1-5.8V10a3 3 0 0 1 6 0Z" />
+  <path d="M7 16v6" />
+  <path d="M13 19v3" />
+  <path d="M12 19h8.3a1 1 0 0 0 .7-1.7L18 14h.3a1 1 0 0 0 .7-1.7L16 9h.2a1 1 0 0 0 .8-1.7L13 3l-1.4 1.5" /></symbol>
+  <symbol id="i-triangle-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+  <path d="M12 9v4" />
+  <path d="M12 17h.01" /></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978" />
+  <path d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978" />
+  <path d="M18 9h1.5a1 1 0 0 0 0-5H18" />
+  <path d="M4 22h16" />
+  <path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" />
+  <path d="M6 9H4.5a1 1 0 0 1 0-5H6" /></symbol>
+  <symbol id="i-volume-2" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" />
+  <path d="M16 9a5 5 0 0 1 0 6" />
+  <path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></symbol>
+  <symbol id="i-volume-x" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" />
+  <line x1="22" x2="16" y1="9" y2="15" />
+  <line x1="16" x2="22" y1="9" y2="15" /></symbol>
+  <symbol id="i-wind" viewBox="0 0 24 24"><path d="M12.8 19.6A2 2 0 1 0 14 16H2" />
+  <path d="M17.5 8a2.5 2.5 0 1 1 2 4H2" />
+  <path d="M9.8 4.4A2 2 0 1 1 11 8H2" /></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" /></symbol>
+</svg>
+
 <!-- 背景装饰：远山 · 祥云 · 暖阳 -->
 <div class="bg-scene" aria-hidden="true">
   <div class="bg-sun"></div>
@@ -41,18 +173,18 @@
 
     <p class="home-intro">原地踏步，云游中国十三景；抬手摘印，间歇坐站。<br>集齐通关文牒，让康复像旅行一样有趣。</p>
 
-    <button id="btn-start" class="btn btn-primary btn-xl btn-pulse">🚶 开始今日旅程</button>
+    <button id="btn-start" class="btn btn-primary btn-xl btn-pulse"><svg class="icon"><use href="#i-footprints"/></svg><span>开始今日旅程</span></button>
 
     <div class="stat-cards">
-      <div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-num" id="stat-streak">0</div><div class="stat-label">连续打卡（天）</div></div>
-      <div class="stat-card"><div class="stat-icon">🏞️</div><div class="stat-num" id="stat-km">0.0</div><div class="stat-label">累计里程（公里）</div></div>
-      <div class="stat-card"><div class="stat-icon">📮</div><div class="stat-num" id="stat-stamps">0</div><div class="stat-label">累计印章（枚）</div></div>
-      <div class="stat-card"><div class="stat-icon">🎖️</div><div class="stat-num" id="stat-sessions">0</div><div class="stat-label">训练次数</div></div>
+      <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-flame"/></svg></div><div class="stat-num" id="stat-streak">0</div><div class="stat-label">连续打卡（天）</div></div>
+      <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-mountain-snow"/></svg></div><div class="stat-num" id="stat-km">0.0</div><div class="stat-label">累计里程（公里）</div></div>
+      <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-stamp"/></svg></div><div class="stat-num" id="stat-stamps">0</div><div class="stat-label">累计印章（枚）</div></div>
+      <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-medal"/></svg></div><div class="stat-num" id="stat-sessions">0</div><div class="stat-label">训练次数</div></div>
     </div>
 
     <div class="home-actions">
-      <button id="btn-passport" class="btn btn-ghost">📖 通关文牒</button>
-      <button id="btn-settings" class="btn btn-ghost">⚙️ 设置与数据</button>
+      <button id="btn-passport" class="btn btn-ghost"><svg class="icon"><use href="#i-book-open"/></svg><span>通关文牒</span></button>
+      <button id="btn-settings" class="btn btn-ghost"><svg class="icon"><use href="#i-settings"/></svg><span>设置与数据</span></button>
     </div>
 
     <p class="home-tip" id="home-tip">建议穿着运动鞋，身前 2 米内留出活动空间。</p>
@@ -151,7 +283,7 @@
           </div>
           <div class="form-row" id="hr-manual-row">
             <label>或手动输入脉搏</label>
-            <input type="number" id="in-hr-manual" placeholder="运动中随时可改" min="40" max="200">
+            <input type="number" id="in-hr-manual" placeholder="如 105" min="40" max="200">
             <span class="unit">次/分</span>
           </div>
           <p class="hint" id="monitor-hint">当前：未连接心率设备。</p>
@@ -179,22 +311,22 @@
           <span id="hud-time">--:--</span>
         </div>
         <div class="hud-chips">
-          <span class="chip">🚶 <b id="hud-steps">0</b> 步</span>
-          <span class="chip">📍 <b id="hud-km">0.00</b> km</span>
-          <span class="chip">📮 <b id="hud-stamps">0</b>/<b id="hud-stamps-need">12</b></span>
-          <span class="chip" id="hud-hr-chip">❤️ <b id="hud-hr">--</b></span>
+          <span class="chip"><svg class="icon"><use href="#i-footprints"/></svg> <b id="hud-steps">0</b> 步</span>
+          <span class="chip"><svg class="icon"><use href="#i-map-pin"/></svg> <b id="hud-km">0.00</b> km</span>
+          <span class="chip"><svg class="icon"><use href="#i-stamp"/></svg> <b id="hud-stamps">0</b>/<b id="hud-stamps-need">12</b></span>
+          <span class="chip" id="hud-hr-chip"><svg class="icon"><use href="#i-heart-pulse"/></svg> <b id="hud-hr">--</b></span>
         </div>
         <div class="hud-btns">
-          <button id="btn-game-sound" class="btn-icon" title="声音开关">🔊</button>
-          <button id="btn-game-pause" class="btn-icon" title="暂停">⏸</button>
-          <button id="btn-game-stop" class="btn-icon btn-danger" title="结束">⏹</button>
+          <button id="btn-game-sound" class="btn-icon" title="声音开关"><svg class="icon"><use href="#i-volume-2"/></svg></button>
+          <button id="btn-game-pause" class="btn-icon" title="暂停"><svg class="icon"><use href="#i-pause"/></svg></button>
+          <button id="btn-game-stop" class="btn-icon btn-danger" title="结束"><svg class="icon"><use href="#i-square"/></svg></button>
         </div>
       </div>
 
       <!-- 步频（左下，预览之上） -->
       <div class="hud hud-cadence">
         <span class="chip chip-cadence">步频 <b id="hud-cadence">0</b> / 目标 <b id="hud-tempo">92</b></span>
-        <span class="chip chip-block hidden" id="hud-block">🪑 <b id="hud-block-reps">0</b> 次 · 剩 <b id="hud-block-time">0</b> 秒</span>
+        <span class="chip chip-block hidden" id="hud-block"><svg class="icon"><use href="#i-armchair"/></svg> <b id="hud-block-reps">0</b> 次 · 剩 <b id="hud-block-time">0</b> 秒</span>
         <button id="btn-block-skip" class="btn-block-skip hidden">跳过小站</button>
       </div>
 
@@ -210,15 +342,15 @@
           <h3>现在感觉怎么样？</h3>
           <p class="dialog-sub">目标：<b>有点累～稍累</b>（还能说话，但唱不了歌）</p>
           <div class="rpe-btns">
-            <button class="rpe-btn" data-v="0"><span class="face">😊</span>很轻松<span class="rpe-val">0</span></button>
-            <button class="rpe-btn" data-v="1"><span class="face">😊</span>轻松<span class="rpe-val">1</span></button>
-            <button class="rpe-btn" data-v="2"><span class="face">🙂</span>还行<span class="rpe-val">2</span></button>
-            <button class="rpe-btn rpe-target" data-v="3"><span class="face">😌</span>有点累<span class="rpe-val">3</span></button>
-            <button class="rpe-btn rpe-target" data-v="4"><span class="face">😮‍💨</span>稍累<span class="rpe-val">4</span></button>
-            <button class="rpe-btn" data-v="5"><span class="face">😓</span>比较累<span class="rpe-val">5</span></button>
-            <button class="rpe-btn" data-v="6"><span class="face">😵</span>很累/难受<span class="rpe-val">6+</span></button>
+            <button class="rpe-btn" data-v="0"><span class="face"><svg class="icon"><use href="#i-laugh"/></svg></span>很轻松<span class="rpe-val">0</span></button>
+            <button class="rpe-btn" data-v="1"><span class="face"><svg class="icon"><use href="#i-smile"/></svg></span>轻松<span class="rpe-val">1</span></button>
+            <button class="rpe-btn" data-v="2"><span class="face"><svg class="icon"><use href="#i-meh"/></svg></span>还行<span class="rpe-val">2</span></button>
+            <button class="rpe-btn rpe-target" data-v="3"><span class="face"><svg class="icon"><use href="#i-frown"/></svg></span>有点累<span class="rpe-val">3</span></button>
+            <button class="rpe-btn rpe-target" data-v="4"><span class="face"><svg class="icon"><use href="#i-annoyed"/></svg></span>稍累<span class="rpe-val">4</span></button>
+            <button class="rpe-btn" data-v="5"><span class="face"><svg class="icon"><use href="#i-angry"/></svg></span>比较累<span class="rpe-val">5</span></button>
+            <button class="rpe-btn" data-v="6"><span class="face"><svg class="icon"><use href="#i-triangle-alert"/></svg></span>很累/难受<span class="rpe-val">6+</span></button>
           </div>
-          <p class="hint talk-test hidden" id="rpe-talktest">🗣️ 说话测试：能连贯说话但唱不了歌 = 强度合适；喘得说不出整句，请放慢或休息。</p>
+          <p class="hint talk-test hidden" id="rpe-talktest"><svg class="icon"><use href="#i-audio-lines"/></svg> 说话测试：能连贯说话但唱不了歌 = 强度合适；喘得说不出整句，请放慢或休息。</p>
           <p class="hint">您的回答会自动调整游戏节奏，如实选择就好。</p>
         </div>
       </div>
@@ -229,7 +361,7 @@
           <h3>休息一下</h3>
           <p class="dialog-sub" id="rest-reason">心率略高，跟着圆圈深呼吸，恢复后继续。</p>
           <div class="breath-ball" id="rest-breath"></div>
-          <p class="hr-big">❤️ <b id="rest-hr">--</b> 次/分 <span id="rest-zone"></span></p>
+          <p class="hr-big"><svg class="icon"><use href="#i-heart-pulse"/></svg> <b id="rest-hr">--</b> 次/分 <span id="rest-zone"></span></p>
           <div class="dialog-btns">
             <button id="btn-rest-resume" class="btn btn-primary">缓过来了，继续</button>
             <button id="btn-rest-stop" class="btn btn-ghost">今天到此为止</button>
@@ -266,18 +398,18 @@
         </div>
       </div>
 
-      <!-- 景点速览（ℹ️ 点击）-->
-      <button id="btn-scene-info" class="btn-icon btn-scene-info" title="景点介绍">ℹ️</button>
+      <!-- 景点速览（info 图标按钮）-->
+      <button id="btn-scene-info" class="btn-icon btn-scene-info" title="景点介绍"><svg class="icon"><use href="#i-info"/></svg></button>
 
       <!-- 手机横屏引导 -->
       <div id="rotate-overlay" class="overlay overlay-rotate hidden">
-        <div class="rotate-phone">📱<div class="rotate-arrow">⟳</div></div>
+        <div class="rotate-phone"><svg class="icon"><use href="#i-smartphone"/></svg><div class="rotate-arrow"><svg class="icon"><use href="#i-rotate-cw"/></svg></div></div>
         <p>请横过来使用<br><span class="hint-inline">横屏视野更好，也更容易拍到全身</span></p>
         <button id="btn-rotate-continue" class="btn btn-ghost">就按竖屏继续</button>
       </div>
 
       <!-- 演示模式触屏踏步 -->
-      <button id="btn-tap-step" class="btn-tap-step hidden">🚶 踏步</button>
+      <button id="btn-tap-step" class="btn-tap-step hidden"><svg class="icon"><use href="#i-footprints"/></svg><span>踏步</span></button>
 
       <!-- 结束确认 -->
       <div id="stop-overlay" class="overlay hidden">
@@ -306,10 +438,10 @@
         <div class="stat-label">本次收入印章</div>
       </div>
       <div class="stat-cards stat-cards-sm">
-        <div class="stat-card"><div class="stat-icon">🚶</div><div class="stat-num" id="sum-steps">0</div><div class="stat-label">步数</div></div>
-        <div class="stat-card"><div class="stat-icon">🏞️</div><div class="stat-num" id="sum-km">0</div><div class="stat-label">公里</div></div>
-        <div class="stat-card"><div class="stat-icon">⏱️</div><div class="stat-num" id="sum-min">0</div><div class="stat-label">分钟</div></div>
-        <div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-num" id="sum-kcal">0</div><div class="stat-label">估算千卡</div></div>
+        <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-footprints"/></svg></div><div class="stat-num" id="sum-steps">0</div><div class="stat-label">步数</div></div>
+        <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-mountain-snow"/></svg></div><div class="stat-num" id="sum-km">0</div><div class="stat-label">公里</div></div>
+        <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-timer"/></svg></div><div class="stat-num" id="sum-min">0</div><div class="stat-label">分钟</div></div>
+        <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-flame"/></svg></div><div class="stat-num" id="sum-kcal">0</div><div class="stat-label">估算千卡</div></div>
       </div>
     </div>
 
@@ -366,7 +498,7 @@
           </div>
           <div class="form-row">
             <label>音效试听</label>
-            <button id="btn-sfx-test" class="btn btn-small">🔊 点我听新音效</button>
+            <button id="btn-sfx-test" class="btn btn-small"><svg class="icon"><use href="#i-volume-2"/></svg><span>点我听新音效</span></button>
           </div>
           <p class="hint">男患者可换男声教练、女患者可换女声教练（取决于设备已安装的中文语音；Windows 自带"辉辉"女声与"康康"男声）。新音效（泡泡摘取、连击变调、里程碑、末印预告）也会在游戏进行中自动播放。</p>
         </div>
@@ -394,7 +526,7 @@
         </div>
         <div class="card">
           <h3>关于</h3>
-          <p class="hint">云游山河 v1.3.2 —— 冠心病 II/III 期（居家）心脏康复体感游戏原型。<br>
+          <p class="hint">云游山河 v1.3.4 —— 冠心病 II/III 期（居家）心脏康复体感游戏原型。<br>
           运动方案：中等强度有氧（踏步）+ 上肢关节活动（摘取）+ 力量小站（间歇坐站，可选开启），三段式课程结构；有氧与安全策略参照 2026 ESC 心脏康复指南与《中国心血管疾病患者居家康复专家共识》，力量与平衡参照《中国人群身体活动指南（2021）》与 WHO《身体活动与久坐行为指南（2020）》。<br>
           <b>本游戏为科研原型，不能替代医嘱；训练方案请遵康复医师指导。</b></p>
         </div>
@@ -409,7 +541,7 @@
   <!-- 微信内打开引导（微信浏览器无法授权摄像头；演示模式可先体验） -->
   <div id="wechat-overlay" class="overlay hidden">
     <div class="dialog">
-      <div class="wechat-icon">💬</div>
+      <div class="wechat-icon"><svg class="icon"><use href="#i-message-circle"/></svg></div>
       <h3>微信内暂不能使用摄像头</h3>
       <p class="dialog-sub">请点击右上角 <b>「···」</b> → <b>「在浏览器中打开」</b>，<br>即可正常使用摄像头进行体感训练。</p>
       <div class="dialog-btns">

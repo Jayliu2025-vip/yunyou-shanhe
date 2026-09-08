@@ -57,7 +57,7 @@ npx http-server -S -C cert.pem -K key.pem -p 8443
 | 依从性设计 | 通关文牒集章（13 景 × 12 印 = 156 枚，环游一圈）、连续打卡、徽章墙、合拍奖励金印 |
 | 趣味反馈 | 摘取连击变调音、步数/里程里程碑播报、末印预告（金框+专属音）、结算称号（山河行者等）——**只奖励协调与出勤，不激励强度** |
 | 声音个性化 | 语音教练可选**男声/女声**（设置页按设备已装中文语音分组选择，可试听）；音效含 CC0 真实感素材（Kenney，泡泡/弹拨/确认音），缺素材自动回退合成音 |
-| 背景巡游 | 同一景点内每 15 秒"远眺"另一处风景（2 秒缓变淡切不闪眼），横幅标注当前站，语义不混淆；可在 config.scene.tourSec 关闭 |
+| 背景轮换 | 同一景点内每 15 秒在本站**多张实拍图**（每站 4 张）之间 2 秒缓变淡切，画面常新但不跨地区——当前站语义始终清晰；可在 config.scene.photoRotateSec 关闭 |
 | 能量估算 | kcal 按准备页"体重"输入折算（kcal = 步数 × 体重 × 0.00064，默认 70kg；粗估仅供参考，不用于处方） |
 | 场景区分 | 准备页可选**居家康复 / 院内监护**两版：院内版强度上限更保守（50% 储备心率）、心率超限 8 秒即暂停、RPE 每 3 分钟询问（便于医护观察），并写入训练记录的"场景"字段 |
 
@@ -111,7 +111,7 @@ js/scenes.js          十三景实景照片渲染（Ken Burns 缓动+道路合�
 js/audio.js           WebAudio 合成音效 + 中文语音教练（零素材依赖）
 js/hr.js              心率接入三通道：Web Bluetooth（0x180D）/ WebSocket 研究设备 / 手动输入
 js/storage.js         localStorage 记录、打卡/徽章、CSV/JSON 导出
-assets/photos/        13 景实景照片（约1.7MB，q7 压缩、SSIM≥0.98；来源与许可见 CREDITS.md）
+assets/photos/        13 景实景照片 ×4 张/站（约 8.7MB，16:9、每张 ≤210KB；来源与许可见 CREDITS.md）
 assets/fonts/         霞鹜文楷 GB 屏读版 webfont 子集（326KB，OFL-1.1，三端统一楷体；见 CREDITS.md）
 manifest.json/sw.js   PWA：主屏图标与离线缓存（页面网络优先、静态资源缓存优先+后台更新；版本号失效）
 vendor/               MediaPipe 模型与 WASM（本地化，**完全离线运行，无需外网**；Apache 2.0，见 vendor/CREDITS.md 与 vendor/LICENSE）
@@ -171,9 +171,9 @@ Otago 运动方案（坐站 4次×2组起步、慢速、可扶椅）。
 
 ## 九、素材与第三方组件版权（合规说明）
 
-- **照片**（assets/photos/）：13 景全部来自 Unsplash / Pixabay / Pexels 的免费商用许可
+- **照片**（assets/photos/）：13 景 ×4 张全部来自 Unsplash / Pixabay / Pexels 的免费商用许可
   （Unsplash License / Pixabay Content License / Pexels License，均无需署名），
-  逐图来源清单见 `assets/photos/CREDITS.md`；
+  逐图来源清单（含 2026-09 新增的 39 张站内轮换图）见 `assets/photos/CREDITS.md`；
 - **音效**（assets/audio/）：Kenney「Interface Sounds」，**CC0**（公有领域），
   见 `assets/audio/CREDITS.md`；其余音效与全部语音为 WebAudio 程序合成，无第三方素材；
 - **姿态识别**（vendor/）：Google MediaPipe Tasks Vision（vision_bundle.mjs、WASM 运行时）

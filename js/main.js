@@ -12,6 +12,8 @@ import { SCENES, preloadScenePhotosAround } from './scenes.js';
 import * as store from './storage.js';
 
 const $ = (id) => document.getElementById(id);
+// 内联 Lucide 图标（index.html 顶部 sprite；ISC License）
+const iconSvg = (name) => `<svg class="icon" aria-hidden="true"><use href="#${name}"/></svg>`;
 const QUICK = new URLSearchParams(location.search).has('quick'); // ?quick=1 快速体验（演示/测试）
 const IS_MOBILE = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
 // 微信内打开：XWeb/WKWebView 通常无法授权摄像头 → 引导到系统浏览器（?wechat=1 可强制触发，便于测试）
@@ -437,10 +439,10 @@ function handleSessionEnd(session, updatedJourney) {
   $('summary-title').textContent = done ? '今日旅程完成！' : '今日旅程已记录';
   // 今日称号（趣味反馈：按完成度与出勤给称号，与运动强度无关，不诱导加练）
   const fullScene = (session.scenesCompleted > 0) || session.stampsEarned >= CONFIG.game.stampCardNeed;
-  $('sum-award').textContent = done
-    ? (fullScene ? '🏅 山河行者 · 集齐一整站' : '🥾 健步旅人')
-    : (fullScene ? '🏅 山河行者 · 集齐一整站'
-      : session.steps >= 300 ? '🌿 小憩游人 · 明天继续' : '🌱 明日再会');
+  $('sum-award').innerHTML = done
+    ? (fullScene ? iconSvg('i-trophy') + '<span>山河行者 · 集齐一整站</span>' : iconSvg('i-footprints') + '<span>健步旅人</span>')
+    : (fullScene ? iconSvg('i-trophy') + '<span>山河行者 · 集齐一整站</span>'
+      : session.steps >= 300 ? iconSvg('i-leaf') + '<span>小憩游人 · 明天继续</span>' : iconSvg('i-sprout') + '<span>明日再会</span>');
   const st = store.streakInfo();
   $('summary-sub').textContent = done
     ? `连续打卡 ${st.current} 天 · 走的每一步，都算数。`
@@ -489,7 +491,7 @@ function handleSessionEnd(session, updatedJourney) {
   const all = store.badges();
   $('summary-badges').innerHTML = all.map(b => `
     <div class="badge ${b.got ? '' : 'locked'}" ${b.got && !prevBadgeIds.includes(b.id) ? 'style="border-color:#c9971e;background:#fff6dd"' : ''}>
-      <span class="icon">${b.icon}</span>
+      <span class="badge-ico">${iconSvg(b.icon)}</span>
       <span><span class="name">${b.name}</span>${b.got && !prevBadgeIds.includes(b.id) ? ' <span style="color:#c9971e">新获得！</span>' : ''}
       <div class="desc">${b.desc}</div></span>
     </div>`).join('');
@@ -549,7 +551,7 @@ function renderPassport() {
     const earned = j.rounds > 0 || i < j.sceneIndex;
     const current = i === j.sceneIndex;
     const cls = earned ? 'earned' : (current ? 'current' : 'locked');
-    const stampInner = earned ? s.ch : (current ? `${j.stampsInScene}/${CONFIG.game.stampCardNeed}` : '🔒');
+    const stampInner = earned ? s.ch : (current ? `${j.stampsInScene}/${CONFIG.game.stampCardNeed}` : iconSvg('i-lock'));
     const prog = current ? `<div class="scene-progress-text">集章进度 ${j.stampsInScene}/${CONFIG.game.stampCardNeed}</div>` : '';
     return `<div class="scene-card ${cls}" data-ch="${s.ch}">
       <div class="scene-name">${s.name}</div>
@@ -624,7 +626,7 @@ function saveCfgFromInputs() {
 
 function syncSoundBtn() {
   const on = settings.sound || settings.speech;
-  $('btn-game-sound').textContent = on ? '🔊' : '🔇';
+  $('btn-game-sound').innerHTML = iconSvg(on ? 'i-volume-2' : 'i-volume-x');
   $('btn-game-sound').classList.toggle('muted', !on);
   $('btn-game-sound').title = on ? '声音：开（点击静音）' : '声音：关（点击开启）';
 }
