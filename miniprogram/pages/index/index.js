@@ -38,7 +38,7 @@ Page({
   // H5 可在关键时刻调用 wx.miniProgram.postMessage({ data: {...} })
   // （目前仅在小程序后退、组件销毁、分享时触发；用于训练完成上报等扩展）
   onMessage(e) {
-    console.log('[web-view message]', e.detail && e.detail.data);
+    // 结果上传服务尚未接入：不打印可能包含健康数据的原始消息，也不假报同步成功。
   },
 
   onShareAppMessage() {

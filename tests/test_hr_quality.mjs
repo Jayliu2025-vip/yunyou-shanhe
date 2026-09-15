@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {HRMonitor} from '../js/hr.js';
+function stream(){let time=1000;const h=new HRMonitor({now:()=>time});assert.equal(typeof h.beginSource,'function'); const token=h.beginSource('ws');return{h,token,setTime:t=>time=t};}
+test('only a fresh live sample counts as ready',()=>{const {h,token,setTime}=stream(); assert.equal(h.snapshot(5000).ready,false); h.acceptSample({bpm:80,sequence:1},token); assert.equal(h.snapshot(5000).ready,true);setTime(6001);assert.equal(h.snapshot(5000).ready,false);assert.equal(h.snapshot(5000).bpm,null);});
+test('old source callbacks cannot resurrect a connection',()=>{const{h,token}=stream();h.disconnect();assert.equal(h.acceptSample({bpm:90},token),false);assert.equal(h.snapshot(5000).ready,false);});
+test('out-of-order and non-finite samples are rejected',()=>{const{h,token}=stream();assert.equal(h.acceptSample({bpm:80,sequence:3},token),true);assert.equal(h.acceptSample({bpm:90,sequence:2},token),false);assert.equal(h.acceptSample({bpm:Infinity,sequence:4},token),false);assert.equal(h.snapshot(5000).bpm,80);});
+test('regressing local time invalidates freshness',()=>{const{h,token,setTime}=stream();h.acceptSample({bpm:80},token);setTime(900);assert.equal(h.snapshot(5000).ready,false);});
+test('manual pulse is labeled separately and never becomes live data',()=>{const{h,token}=stream();h.acceptSample({bpm:85},token);h.setManual(75);assert.equal(h.snapshot(5000).ready,false);assert.equal(h.snapshot(5000).source,'manual');assert.equal(h.snapshot(5000).bpm,75);});
+test('BLE absent sensor contact is rejected when the device reports contact support',()=>{const h=new HRMonitor();assert.equal(h._parseHR(new DataView(Uint8Array.of(4,80).buffer)),null);});
+test('explicit contact loss invalidates the previous sample immediately',()=>{const{h,token}=stream();h.acceptSample({bpm:80,contact:true},token);h.acceptSample({bpm:80,contact:false},token);assert.equal(h.snapshot(5000).ready,false);assert.equal(h.snapshot(5000).bpm,null);});
+test('contact loss does not need a valid bpm to invalidate the source',()=>{for(const message of [{contact:false},{contact:false,bpm:0}]){const{h,token}=stream();h.acceptSample({bpm:90},token);h.acceptSample(message,token);assert.equal(h.snapshot(5000).ready,false);}});
+test('historical or obsolete timestamped packets do not become live readings',()=>{for(const message of [{bpm:80,historical:true},{bpm:80,measuredAt:'1970-01-01T00:00:00Z'}]){const{h,token}=stream();assert.equal(h.acceptSample(message,token),false);assert.equal(h.snapshot(5000).ready,false);}});

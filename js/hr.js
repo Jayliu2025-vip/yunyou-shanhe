@@ -1,124 +1,102 @@
-/**
- * 心率监测：
- *  1. 蓝牙心率带（Web Bluetooth，标准心率服务 0x180D，兼容 Polar H7/H9/H10、
- *     迪卡侬、华为等绝大多数蓝牙心率设备）
- *  2. 无蓝牙时支持手动输入（运动前后测脉搏填入）
- */
-
+/** Heart-rate transport and quality. No medical threshold decisions here. */
 export class HRMonitor {
-  constructor() {
-    this.bpm = null;
-    this.connected = false;
-    this.deviceName = '';
-    this.manual = false;
-    this._device = null;
-    this._server = null;
-    this._char = null;
-    this.onUpdate = null;   // 回调 (bpm) => void
-    this.onStatus = null;   // 回调 (status) => void : 'idle'|'connecting'|'connected'|'disconnected'|'unsupported'
+  constructor({now=()=>performance.now()}={}) {
+    this.now=now; this.generation=0; this.maxAgeMs=5000;
+    this._bpm=null; this.connected=false; this.manual=false; this.source='none'; this.status='idle';
+    this.deviceName=''; this.sample=null; this.lastSequence=null;
+    this.onUpdate=null; this.onStatus=null;
   }
-
-  static get supported() {
-    return typeof navigator !== 'undefined' && !!navigator.bluetooth;
+  static get supported() { return typeof navigator!=='undefined' && !!navigator.bluetooth; }
+  get bpm() { return this.snapshot().bpm; }
+  _status(status) { this.status=status; try { this.onStatus?.(status); } catch {} }
+  beginSource(source) {
+    this.disconnect();
+    if(!['ble','ws'].includes(source)) throw new Error('Unsupported source');
+    this.source=source; this.manual=false; this._status('connecting'); return this.generation;
   }
-
-  _status(s) { if (this.onStatus) this.onStatus(s); }
-
+  acceptSample(message,token) {
+    if(token!==this.generation||!['ble','ws'].includes(this.source)) return false;
+    if(message?.contact===false) {this.invalidateSample('contact-lost');return false;}
+    if(message?.historical===true) return false;
+    if(message?.measuredAt!=null && (!Number.isFinite(Date.parse(message.measuredAt)) || Math.abs(Date.now()-Date.parse(message.measuredAt))>this.maxAgeMs)) {this.invalidateSample('invalid-sample');return false;}
+    const bpm=message?.bpm, sequence=message?.sequence, t=this.now();
+    if(!Number.isFinite(bpm)||bpm<=0||bpm>65535||!Number.isFinite(t)) return false;
+    if(message.unit!=null && message.unit!=='bpm') return false;
+    if(sequence!=null && (!Number.isSafeInteger(sequence)||sequence<0)) return false;
+    if(this.lastSequence!=null && (sequence==null||sequence<=this.lastSequence)) return false;
+    if(this.sample && t<this.sample.receivedAtMono) { this.sample=null; this._bpm=null; this._status('stale'); return false; }
+    this.lastSequence=sequence??null; this._bpm=Math.round(bpm); this.connected=true;
+    this.sample=Object.freeze({metric:'heart-rate',value:this._bpm,unit:'bpm',source:this.source,generation:token,
+      receivedAtMono:t,receivedAt:new Date().toISOString(),measuredAt:typeof message.measuredAt==='string'?message.measuredAt:null,sequence:sequence??null,contact:message.contact??null});
+    this._status('connected'); try { this.onUpdate?.(this._bpm); } catch {} return true;
+  }
+  invalidateSample(reason='invalid-sample') {this.sample=null;this._bpm=null;this._status(reason);}
+  snapshot(maxAgeMs=this.maxAgeMs) {
+    if(this.manual) return {ready:false,bpm:this._bpm,source:'manual',status:'manual',sample:this.sample,generation:this.generation};
+    const age=this.sample?this.now()-this.sample.receivedAtMono:Infinity;
+    const ready=this.connected && Number.isFinite(maxAgeMs) && maxAgeMs>0 && age>=0 && age<=maxAgeMs;
+    return {ready:!!ready,bpm:ready?this._bpm:null,source:this.source,status:ready?'connected':this.sample?'stale':this.status,sample:ready?this.sample:null,generation:this.generation};
+  }
   async connect() {
-    if (!HRMonitor.supported) { this._status('unsupported'); return false; }
-    this._status('connecting');
+    if(!HRMonitor.supported) { this._status('unsupported'); return false; }
+    const token=this.beginSource('ble'); let server;
     try {
-      this._device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: ['heart_rate'] }],
-        optionalServices: ['battery_service'],
+      const device=await navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']}]});
+      if(token!==this.generation) return false;
+      this._device=device;
+      device.addEventListener('gattserverdisconnected',()=>{if(token===this.generation) this._lost(token);});
+      server=await device.gatt.connect();
+      if(token!==this.generation) { try { if(server!==this._server) server.disconnect(); } catch {} return false; }
+      this._server=server;
+      const service=await server.getPrimaryService('heart_rate');
+      const char=await service.getCharacteristic('heart_rate_measurement');
+      if(token!==this.generation) return false;
+      this._char=char;
+      char.addEventListener('characteristicvaluechanged',event=>{
+        const value=this._parseHR(event.target.value);
+        if(value!=null) this.acceptSample({bpm:value},token);
+        else if(token===this.generation) this.invalidateSample('invalid-sample');
       });
-      this._device.addEventListener('gattserverdisconnected', () => {
-        this.connected = false;
-        this.bpm = null;          // 清空残留值，避免旧心率继续驱动显示与自动暂停
-        this._status('disconnected');
-      });
-      this._server = await this._device.gatt.connect();
-      const svc = await this._server.getPrimaryService('heart_rate');
-      this._char = await svc.getCharacteristic('heart_rate_measurement');
-      await this._char.startNotifications();
-      this._char.addEventListener('characteristicvaluechanged', (e) => {
-        const bpm = this._parseHR(e.target.value);
-        if (bpm > 0) {
-          this.bpm = bpm;
-          this.manual = false;
-          this.connected = true;
-          if (this.onUpdate) this.onUpdate(bpm);
-        }
-      });
-      this.connected = true;
-      this.deviceName = this._device.name || '蓝牙心率带';
-      this._status('connected');
-      return true;
-    } catch (e) {
-      // 用户取消选择或连接失败
-      this._status(e.name === 'NotFoundError' ? 'idle' : 'disconnected');
-      return false;
-    }
+      await char.startNotifications();
+      if(token!==this.generation) return false;
+      this.connected=true; this.deviceName=device.name||'心率设备'; this._status(this.sample?'connected':'waiting'); return true;
+    } catch { if(token===this.generation) this._lost(token); return false; }
   }
-
-  /** 解析蓝牙心率测量值（0x00 标志 → uint8，0x01 → uint16） */
   _parseHR(dv) {
-    const flags = dv.getUint8(0);
-    if (flags & 0x01) {
-      return dv.getUint16(1, true);
-    }
+    if(!dv || typeof dv.getUint8!=='function' || dv.byteLength<2) return null;
+    const flags=dv.getUint8(0);
+    if((flags&4) && !(flags&2)) return null;
+    if(flags&1) return dv.byteLength>=3?dv.getUint16(1,true):null;
     return dv.getUint8(1);
   }
-
-  /** 手动模式：患者用指测脉搏后输入 */
-  setManual(bpm) {
-    const v = parseInt(bpm, 10);
-    if (v > 30 && v < 220) {
-      this.bpm = v;
-      this.manual = true;
-      if (this.onUpdate) this.onUpdate(v);
-    }
+  setManual(value) {
+    const bpm=Number(value); if(!Number.isFinite(bpm)||bpm<=0||bpm>65535) return false;
+    this.disconnect(); this.manual=true; this.source='manual'; this._bpm=Math.round(bpm);
+    this.sample={metric:'heart-rate',value:this._bpm,unit:'bpm',source:'manual',receivedAt:new Date().toISOString()};
+    this._status('manual'); return true;
   }
-
-  clearManual() {
-    if (this.manual) { this.bpm = null; this.manual = false; }
-  }
-
-  /**
-   * 研究设备模式：经 WebSocket 接收生理数据（如津发科技手环经其采集软件转发）。
-   * 消息格式：JSON，任一字段 {bpm|hr|heart_rate|value} 为每分钟心跳数。
-   */
+  clearManual() { if(this.manual) this.disconnect(); }
   connectWS(url) {
-    let ws;
-    try { ws = new WebSocket(url); } catch (e) { this._status('unsupported'); return false; }
-    this._status('connecting');
-    this._ws = ws;
-    ws.onopen = () => {
-      this.connected = true; this.manual = false;
-      this.deviceName = '研究设备（WebSocket）';
-      this._status('connected');
-    };
-    ws.onmessage = (ev) => {
-      try {
-        const m = JSON.parse(ev.data);
-        const bpm = m.bpm ?? m.hr ?? m.heart_rate ?? m.value;
-        if (typeof bpm === 'number' && bpm > 30 && bpm < 220) {
-          this.bpm = Math.round(bpm);
-          this.manual = false;
-          if (this.onUpdate) this.onUpdate(this.bpm);
-        }
-      } catch (e) { /* 非 JSON 忽略 */ }
-    };
-    ws.onclose = () => { this.connected = false; this.bpm = null; this._status('disconnected'); };
-    ws.onerror = () => { this.connected = false; this.bpm = null; this._status('disconnected'); };
-    return true;
+    let parsed; try { parsed=new URL(url); } catch { return false; }
+    if(!['ws:','wss:'].includes(parsed.protocol)||parsed.username||parsed.password) return false;
+    if(parsed.protocol==='ws:' && !['localhost','127.0.0.1','[::1]'].includes(parsed.hostname)) return false;
+    const token=this.beginSource('ws'); let ws;
+    try { ws=new WebSocket(parsed.href); } catch { this._lost(token); return false; }
+    this._ws=ws;
+    ws.onopen=()=>{if(token!==this.generation) return; this.connected=true;this.deviceName='研究网关';this._status('waiting');};
+    ws.onmessage=event=>{if(token!==this.generation || typeof event.data!=='string' || event.data.length>4096) return;
+      try { const m=JSON.parse(event.data); this.acceptSample({bpm:m.bpm??m.hr??m.heart_rate,sequence:m.sequence,unit:m.unit,contact:m.contact,measuredAt:m.measuredAt,historical:m.historical},token); } catch {} };
+    ws.onclose=()=>this._lost(token); ws.onerror=()=>this._lost(token); return true;
   }
-
+  _lost(token) { if(token!==this.generation) return; this.disconnect(); this._status('disconnected'); }
   disconnect() {
-    try { if (this._ws) this._ws.close(); } catch (e) {}
-    try { if (this._char) this._char.stopNotifications(); } catch (e) {}
-    try { if (this._server) this._server.disconnect(); } catch (e) {}
-    this.connected = false;
+    ++this.generation;
+    const ws=this._ws, char=this._char, server=this._server;
+    this._ws=null;this._char=null;this._server=null;this._device=null;
+    this.connected=false;this.manual=false;this.source='none';this.sample=null;this._bpm=null;this.lastSequence=null;this.deviceName='';
+    try { ws?.close(); } catch {}
+    try { Promise.resolve(char?.stopNotifications()).catch(()=>{}); } catch {}
+    try { server?.disconnect(); } catch {}
     this._status('idle');
   }
 }

@@ -11,6 +11,7 @@
 export class AudioCoach {
   constructor(settings) {
     this.settings = settings;
+    this._activeNodes=new Set(); this._sessionMuted=false; this.revision=0;
     this.ctx = null;
     this._lastSpeech = 0;
     this._zhVoice = null;
@@ -37,7 +38,7 @@ export class AudioCoach {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
       } catch (e) { console.warn('音频初始化失败', e); }
     }
-    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(()=>{});
     this._loadSfx();
   }
 
@@ -78,6 +79,7 @@ export class AudioCoach {
       g.gain.linearRampToValueAtTime((this.isMobile ? 0.85 : 0.7) * gain, t0 + 0.008);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + buf.duration / rate);
       src.connect(g).connect(this.ctx.destination);
+      this._track(src);
       src.start(t0);
       return true;
     } catch (e) { return false; }
@@ -107,7 +109,16 @@ export class AudioCoach {
     document.addEventListener('keydown', unlock);
   }
 
-  get enabled() { return this.settings.sound && this.ctx; }
+  get enabled() { return this.settings.sound && this.ctx && !this._sessionMuted; }
+  stopAll() {
+    this._sessionMuted=true; this.revision=(this.revision||0)+1;
+    try { window.speechSynthesis?.cancel(); } catch {}
+    for(const node of this._activeNodes||[]) {try{node.stop();}catch{}}
+    this._activeNodes?.clear();
+  }
+  resumeSessionAudio() { this._sessionMuted=false; this.revision=(this.revision||0)+1; }
+  _track(node) { this._activeNodes.add(node); node.onended=()=>{this._activeNodes.delete(node);try{node.disconnect();}catch{}}; }
+
 
   /** 触感反馈（手机）：pattern 为毫秒或数组；桌面端自动忽略 */
   vibrate(pattern) {
@@ -129,6 +140,7 @@ export class AudioCoach {
     g.gain.linearRampToValueAtTime(g0, t0 + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     osc.connect(g).connect(this.ctx.destination);
+    this._track(osc);
     osc.start(t0); osc.stop(t0 + dur + 0.05);
   }
 
@@ -282,7 +294,7 @@ export class AudioCoach {
 
   /** 中文语音提示（节流：同样的话 6 秒内不重复） */
   speak(text, force = false) {
-    if (!this.settings.speech) return;
+    if (!this.settings.speech || (this._sessionMuted && !force)) return;
     const now = performance.now();
     if (!force && now - this._lastSpeech < 6000 && this._lastText === text) return;
     this._lastSpeech = now; this._lastText = text;

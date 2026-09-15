@@ -5,7 +5,10 @@
  * - 自适应强度：RPE 反馈调节目标步频；心率超限自动暂停
  * - 集章系统：每景点集齐 12 枚印章 → 盖章仪式 → 解锁下一景点
  */
-import { CONFIG, targetHrZone } from './config.js';
+import { CONFIG } from './config.js';
+import { SessionSafety, frameDelta } from './session-safety.js';
+import { canStartPlan } from './rehab-plan.js';
+import { drawArt, drawArtFallback, stampArtUrl, propArtUrl, preloadSceneArt } from './art.js';
 import { SCENES, drawWorld, HEALTH_TIPS, preloadScenePhotosAround, ensureScenePhotos, cachedGrad } from './scenes.js';
 
 const G = CONFIG.game;
@@ -64,7 +67,7 @@ export class Game {
     this.phase = 'warmup';
     this.phaseElapsed = 0;
     this.phaseDur = 0;
-    this.tempo = T.start;
+    this.tempo = 0;
     this.beatAcc = 0;
     this.beatStrong = true;
     this.beatPhase = 0;
@@ -120,20 +123,28 @@ export class Game {
 
   /* ---------------- 生命周期 ---------------- */
 
-  start(plan) {
+  start(plan, {sessionId, inputSource} = {}) {
+    if (this.running || this.safety?.terminal || !canStartPlan(plan).ok || !sessionId) return false;
     this.reset();
+    this.sessionId=sessionId; this.inputSource=inputSource;
+    this.safety=new SessionSafety(); this.safety.start();
+    this.hr.maxAgeMs=plan.sampleMaxAgeMs;
+    this.body.poseMaxAgeMs=plan.poseMaxAgeMs||1000;
     this.plan = plan;
+    preloadSceneArt(SCENES[this.journey.sceneIndex].id);
     this.hrZone = plan.hrZone;
     // 监护方式：'hr'=实时心率（蓝牙/研究设备）；'manual'=手动脉搏；'rpe'=无设备（RPE+症状+说话测试）
-    this.monitor = plan.monitor || 'rpe';
+    const initialHr=this.hr.snapshot(plan.sampleMaxAgeMs);
+    this.monitor=initialHr.ready?'hr':initialHr.source==='manual'?'manual':'rpe';
+    this._hrGeneration=initialHr.generation;
     this.rpePrimary = this.monitor !== 'hr' || !!this.profile.betaBlocker;
     // 院内监护模式：更快的超限响应与更频繁的 RPE 询问
-    this.hrOverLimitSec = plan.hrOverLimitSec ?? CONFIG.medical.hrOverLimitPauseSec;
-    this.rpeInterval = plan.rpePromptIntervalSec ?? CONFIG.medical.rpePromptIntervalSec;
+    this.hrOverLimitSec = plan.hrOverLimitSec;
+    this.rpeInterval = plan.rpePromptIntervalSec;
     this.phase = 'warmup';
     this.phaseDur = plan.warmupSec;
-    this.tempo = T.warmup;
-    this.rpeNextAt = plan.warmupSec + this.rpeInterval;
+    this.tempo = plan.warmupTempo;
+    this.rpeNextAt = this.rpeInterval;
     this.tipToast = null;       // 整理阶段健康小知识
     this.tipNextAt = Infinity;
     this.tipIdx = Math.floor(Math.random() * HEALTH_TIPS.length);
@@ -153,9 +164,9 @@ export class Game {
     // 站内轮换：15 秒后开始在本景点多张图间缓变淡切（暂停时 simTime 停走，轮换同步暂停）
     this.photoNextAt = CONFIG.scene.photoRotateSec > 0 ? CONFIG.scene.photoRotateSec : Infinity;
     this._showPhaseTitle('热身开始', '跟着脚印轻轻踏步，活动开身体');
-    // 无设备模式开场告知安全主控方式（说话测试口诀，CSANZ 2023 / 中国居家康复共识口径）
-    const intro = this.monitor === 'rpe'
-      ? '训练开始。本次以疲劳感觉和症状为主：保持能说话、但唱不了歌的强度；如有胸闷气短头晕，请立即停止。先热身，跟着脚印的节奏轻轻踏步。'
+    // 明确监测能力，演示不承诺临床安全。
+    const intro = plan.scope === 'demo'
+      ? '演示开始。本次不产生正式康复记录。如有不适，请使用不舒服停止按钮。先查看动作提示。'
       : '训练开始。先热身，跟着屏幕下方脚印的节奏，轻轻踏步。';
     this.audio.speak(intro, true);
     // 力量小站：开场告知椅子前置要求（安全底线：稳固、靠墙、无轮）
@@ -166,31 +177,86 @@ export class Game {
     this.onEvent({ type: 'scene-intro', scene: SCENES[this.journey.sceneIndex] });
     this._resize();
     this._loop();
+    return true;
   }
 
   pause(reason) {
-    if (!this.running || this.paused) return;
-    this.paused = true;
-    this.pauseReason = reason;
-    this.events.push({ t: Math.round(this.simTime), type: 'pause', reason });
+    if (!this.running || !this.safety?.pause(reason)) return false;
+    this.paused=true; this.pauseReason=reason;
+    this.syncTime=0; this.hrOverSec=0;
+    this.audio.stopAll?.();
+    this.events.push({t:Math.round(this.simTime),type:'pause',reason});
+    return true;
   }
 
-  resume() {
-    if (!this.running || !this.paused) return;
-    if (this.pauseReason === 'rpe') { /* RPE 由 answerRpe 恢复 */ }
-    this.paused = false;
-    this.pauseReason = null;
-    this._lastFrame = performance.now();
+  safetyStop(reason='symptom') {
+    if(!this.running || !this.safety?.stopForSafety(reason)) return false;
+    this.paused=true; this.pauseReason=reason; this.syncTime=0; this.hrOverSec=0;
+    this.audio.stopAll?.();
+    this.events.push({t:Math.round(this.simTime),type:'safety-stop',reason});
+    this.onEvent({type:'safety-stop',reason,sessionId:this.sessionId});
+    return true;
+  }
+
+  resume(review={}) {
+    if(!this.running || !this.paused || this.safety?.terminal) return false;
+    if(review.release) {
+      if(!['scene-intro','rpe'].includes(review.release)) return false;
+      this.safety.release(review.release);
+    }
+    if(review.reviewed) {
+      if(review.symptomFree!==true||review.talkComfortable!==true||!Number.isFinite(review.rpe)||review.rpe<0||review.rpe>this.plan.rpeTargetHigh) return false;
+      if(!canStartPlan(this.plan).ok) return false;
+      const hr=this.hr.snapshot(this.plan.sampleMaxAgeMs);
+      const needsHr=this.plan.requiredHr || this.monitor==='hr';
+      let fallback=false;
+      if(needsHr && !hr.ready) {
+        if(!(this.plan.allowHrFallback && review.usePhone===true)) return false;
+        fallback=true;
+      }
+      if(hr.ready && this.plan.hrStopAbove!=null && hr.bpm>this.plan.hrStopAbove) return false;
+      if(this.bodyState?.mode==='camera' && !this.bodyState.ok) return false;
+      if(typeof document!=='undefined' && document.hidden) return false;
+      if(fallback) {
+        this.monitor='rpe'; this.rpePrimary=true; this.hr.disconnect();
+        this.events.push({t:Math.round(this.simTime),type:'monitor-change',reason:'explicit-phone-fallback'});
+      }
+      this._hrGeneration=this.hr.generation;
+      this.rpeSamples.push({t:Math.round(this.simTime),v:review.rpe});
+    }
+    if(!this.safety.resume({reviewed:review.reviewed===true})) return false;
+    this.paused=false; this.pauseReason=null;
+    this.lastSteps=this.body?.steps ?? this.bodyState?.steps ?? this.lastSteps;
+    if(this.body?.sitStandReps!=null) this.sitStandBase=this.body.sitStandReps-this.sitStandReps;
+    this.syncTime=0; this.hrOverSec=0; this.rpeNextAt=this.simTime+this.rpeInterval;
+    this._lastFrame=performance.now(); this.audio.resumeSessionAudio?.();
+    this.events.push({t:Math.round(this.simTime),type:'resume'});
+    return true;
+  }
+
+  checkInputs() {
+    if(!this.running || this.safety?.terminal) return;
+    if(!canStartPlan(this.plan).ok) { this.safetyStop('plan-invalid'); return; }
+    const hr=this.hr.snapshot(this.plan.sampleMaxAgeMs);
+    if(this.monitor==='hr' && (!hr.ready || hr.generation!==this._hrGeneration) && !this.safety.pending.has('device-lost')) {
+      this.pause('device-lost'); this.onEvent({type:'input-pause',reason:'device-lost'});
+    }
+    if(this.bodyState?.mode==='camera' && !this.bodyState.ok && !this.safety.pending.has('pose-lost')) {
+      this.pause('pose-lost'); this.onEvent({type:'input-pause',reason:'pose-lost'});
+    }
   }
 
   /** 用户主动结束（保留已完成部分） */
   stop(reason = 'user') {
-    this.finishSession(reason);
+    this.finishSession(this.safety?.state==='SAFETY_STOPPED'?'safety':reason);
   }
 
   finishSession(endedBy) {
     if (!this.running) return;
+    if(this.safety?.state==='SAFETY_STOPPED') endedBy='safety';
+    this.safety?.finish(endedBy==='completed');
     this.running = false;
+    this.audio.stopAll?.();
     cancelAnimationFrame(this._raf);
     window.removeEventListener('resize', this._resize);
     const dur = {
@@ -202,6 +268,8 @@ export class Game {
     const cadSamples = this.samples.map(s => s.cadence).filter(c => c > 0);
     const hrVals = this.hrSeries.map(s => s.v).filter(v => v > 40);
     const session = {
+      sessionId:this.sessionId,dataScope:this.plan.scope,planId:this.plan.id,planVersion:this.plan.version,
+      inputSource:this.inputSource,rpeScale:this.plan.rpeScale,
       date: new Date().toISOString(),
       endedBy,
       mode: this.plan.mode,
@@ -219,7 +287,7 @@ export class Game {
       sitStandReps: this.sitStandReps || 0,   // 力量小站：本次起坐总数
       blocksRun: this.blocksRun || 0,         // 力量小站：完成组数
       strengthBlocks: !!this.plan.strengthBlocks,
-      kcal: this.stepsThisSession * (this.profile.weightKg || 70) * G.kcalPerStepPerKg, // 按档案体重折算
+      kcal: Number.isFinite(this.profile.weightKg)?this.stepsThisSession*this.profile.weightKg*G.kcalPerStepPerKg:null, // 按档案体重折算
       rpeSamples: this.rpeSamples,
       hrSeries: this.hrSeries,
       samples: this.samples,
@@ -250,14 +318,18 @@ export class Game {
   _loop = () => {
     if (!this.running) return;
     const now = performance.now();
-    const dt = Math.min(0.05, (now - this._lastFrame) / 1000);
+    const frame=frameDelta(now,this._lastFrame);
+    const dt=frame.dt;
+    if(frame.reason && !this.paused && !this.safety.terminal) {this.pause(frame.reason);this.onEvent({type:'input-pause',reason:frame.reason});}
     this._lastFrame = now;
 
-    const bodyState = this.body.update(now);
+    let bodyState;
+    try { bodyState=this.body.update(now); } catch { this.safetyStop('input-error'); bodyState={ok:false,mode:'camera',steps:this.lastSteps,cadence:0}; }
     this.bodyState = bodyState;
     // 摄像头模式：左下角预览实时绘制（drawPreview 内部自判 demo/空指针）
     this.body.drawPreview();
 
+    this.checkInputs();
     if (!this.paused) this._update(dt, bodyState, now);
     this._render(now);
 
@@ -270,6 +342,9 @@ export class Game {
   };
 
   _update(dt, bs, now) {
+    if(!this.running || this.paused || this.safety?.terminal) return;
+    this._updateHr(dt);
+    if(this.paused) return;
     this.simTime += dt;
     this.phaseElapsed += dt;
     this._phaseTime = this._phaseTime || {};
@@ -339,7 +414,7 @@ export class Game {
     }
 
     /* --- RPE 定时 --- */
-    if (this.phase === 'main' && this.simTime >= this.rpeNextAt) {
+    if (this.simTime >= this.rpeNextAt) {
       this.rpeNextAt += this.rpeInterval;
       this.pause('rpe');
       this.audio.chime();
@@ -378,8 +453,7 @@ export class Game {
       this.photoFade = null;
     }
 
-    /* --- 心率安全 --- */
-    this._updateHr(dt);
+    // 心率与输入守卫在计数和奖励更新之前执行。
 
     /* --- 力量小站状态机（预告 → 坐站 → 收尾；RPE 弹窗暂停时 simTime 冻结自然顺延） --- */
     this._updateBlock(dt, bs);
@@ -439,6 +513,7 @@ export class Game {
 
     /* --- 庆祝与场景切换 --- */
     if (this.celebrate && this.simTime >= this.celebrate.until) this._finishCelebrate();
+    if(this.paused || this.safety?.terminal) return;
     if (this.transition && this.simTime >= this.transition.until) this.transition = null;
     if (this.phaseTitle && this.simTime >= this.phaseTitle.until) this.phaseTitle = null;
 
@@ -451,10 +526,10 @@ export class Game {
       this.sampleAcc = 0;
       this.samples.push({
         t: Math.round(this.simTime), phase: this.phase,
-        hr: this.hr.bpm || null, cadence: Math.round(this.dispCadence), tempo: this.tempo,
+        hr: this.monitor==='hr'?(this.hr.bpm||null):null, cadence: Math.round(this.dispCadence), tempo: this.tempo,
       });
     }
-    if (this.hr.bpm && !this.hr.manual) {
+    if (this.monitor==='hr' && this.hr.bpm && !this.hr.manual) {
       this.hrSampleAcc += dt;
       if (this.hrSampleAcc >= 2) {
         this.hrSampleAcc = 0;
@@ -471,30 +546,15 @@ export class Game {
   }
 
   _updateHr(dt) {
-    const bpm = this.hr.bpm;
-    if (!bpm || this.hr.manual || !this.hrZone) return;
-    // β受体阻滞剂/起搏器：心率法失真 → 不做自动暂停，仅记录事件（HUD 仍会变色提示）
-    const beta = !!this.profile.betaBlocker;
-    if (bpm > this.hrZone.high) {
-      this.hrOverSec += dt;
-      if (beta) {
-        if (this.hrOverSec >= (this.hrOverLimitSec ?? CONFIG.medical.hrOverLimitPauseSec)) {
-          this.hrOverSec = 0;
-          this.events.push({ t: Math.round(this.simTime), type: 'beta-hr-high', bpm });
-        }
-        return;
+    if(this.monitor!=='hr') {this.hrOverSec=0;return;}
+    const state=this.hr.snapshot(this.plan.sampleMaxAgeMs);
+    if(!state.ready || !Number.isFinite(this.plan.hrStopAbove)) { this.hrOverSec=0; return; }
+    if(state.bpm>this.plan.hrStopAbove) {
+      this.hrOverSec+=dt;
+      if(this.hrOverSec>=this.plan.hrOverLimitSec) {
+        this.autoPauses++; this.safetyStop('prescribed-hr-stop');
       }
-      if (this.hrOverSec >= this.hrOverLimitSec && !this.paused) {
-        this.hrOverSec = 0;
-        this.autoPauses++;
-        this.pause('hr-high');
-        this.audio.warn();
-        this.audio.speak('心率偏高，我们先休息一会儿，跟着圆圈深呼吸。', true);
-        this.onEvent({ type: 'hr-pause', bpm, suggestEnd: this.autoPauses >= 3 });
-      }
-    } else {
-      this.hrOverSec = Math.max(0, this.hrOverSec - dt * 2);
-    }
+    } else this.hrOverSec=0;
   }
 
   /* ---------------- 力量小站（间歇坐站，plan.strengthBlocks 开启） ---------------- */
@@ -621,13 +681,13 @@ export class Game {
     this._phaseTime = this._phaseTime || {};
     if (name === 'main') {
       this.phaseDur = this.plan.mainSec;
-      this.tempo = T.start;
+      this.tempo = this.plan.tempoStart;
       this._showPhaseTitle('主运动', '保持"有点累"的感觉，摘取印章吧');
       this.audio.chime();
       this.audio.speak('热身完成，正式启程！保持有点累、还能说话的节奏。', true);
     } else if (name === 'cooldown') {
       this.phaseDur = this.plan.cooldownSec;
-      this.tempo = T.cooldown;
+      this.tempo = this.plan.cooldownTempo;
       this.items = [];
       this.block = null;   // 主运动结束时小站未完成则直接作废（整理阶段只做放松）
       this._showPhaseTitle('整理放松', '放慢脚步，跟着圆圈深呼吸');
@@ -710,6 +770,7 @@ export class Game {
   }
 
   _addStamp(golden) {
+    if(!this.running || this.paused || this.safety?.terminal) return;
     this.stampsEarned++;
     this.journey.stampsInScene++;
     if (golden) {
@@ -751,33 +812,23 @@ export class Game {
   }
 
   answerRpe(v) {
-    this.rpeSamples.push({ t: Math.round(this.simTime), v });
-    this.events.push({ t: Math.round(this.simTime), type: 'rpe', v });
-    const { rpeTargetLow, rpeTargetHigh } = CONFIG.medical;
-    if (v >= 6) {
-      // 明显疲劳/不适：保守处置——直接进休息界面，缓过来后由患者决定继续或结束
-      this.tempo = Math.max(T.min, this.tempo + T.rpeHighAdjust);
+    if(!this.running || this.safety?.terminal || !Number.isFinite(v) || v<0 || v>10) return false;
+    this.rpeSamples.push({t:Math.round(this.simTime),v});
+    this.events.push({t:Math.round(this.simTime),type:'rpe',v});
+    const high=this.plan.rpeTargetHigh??4, pauseAt=this.plan.rpePauseAt??6;
+    if(v>=pauseAt) {
+      this.tempo=Math.max(this.plan.tempoMin??60,this.tempo-(this.plan.tempoDownStep||0));
       this.pause('rpe-hard');
-      this.audio.warn();
-      this.audio.speak('很累时我们应当休息。跟着圆圈深呼吸，缓过来后可以继续，也可以今天到此为止。', true);
-      this.onEvent({ type: 'hr-pause', bpm: null, reason: 'rpe', suggestEnd: true });
-      return;
+      this.onEvent({type:'input-pause',reason:'rpe-hard'}); return true;
     }
-    if (v >= 5) {
-      this.tempo = Math.max(T.min, this.tempo + T.rpeHighAdjust);
-      // 力量小站：RPE≥5 跳过下一个小站（安全优先，见 config.exercise.rpeSkipAt）
-      if (this.plan.strengthBlocks) this.blockSkip = true;
-      this.audio.speak('明白，我们把节奏放慢一些，舒服最重要。');
-      this._showPhaseTitle('已放慢节奏', '目标步频 ' + this.tempo + ' 步/分');
-    } else if (v <= 2 && this.phase === 'main') {
-      this.tempo = Math.min(T.max, this.tempo + T.rpeLowAdjust);
-      this.audio.speak('感觉很轻松，那我们稍微加快一点点。');
-      this._showPhaseTitle('稍微加速', '目标步频 ' + this.tempo + ' 步/分');
-    } else {
-      this.audio.speak('很好，这个强度正合适，继续保持！');
+    if(v>high) {
+      this.tempo=Math.max(this.plan.tempoMin??60,this.tempo-(this.plan.tempoDownStep||0));
+      if(this.plan.strengthBlocks) this.blockSkip=true;
+      this.audio.speak('已记录，我们先放慢节奏。如有不适，请停止。',true);
     }
-    this.pauseReason = null;
-    this.resume();
+    // A low response is recorded, never used to increase prescribed load.
+    this.resume({release:'rpe'});
+    return true;
   }
 
   /* ---------------- HUD 数据 ---------------- */
@@ -785,7 +836,7 @@ export class Game {
   hudSnapshot() {
     const totalRemain = this._totalRemainSec();
     const scene = SCENES[this.journey.sceneIndex];
-    const bpm = this.hr.bpm;
+    const bpm = this.monitor==='hr'||this.monitor==='manual'?this.hr.bpm:null;
     return {
       phase: this.phase,
       phaseLabel: { warmup: '热身', main: '主运动', cooldown: '整理放松' }[this.phase],
@@ -800,6 +851,9 @@ export class Game {
       sceneName: scene.name,
       sceneCh: scene.ch,
       hr: bpm,
+      hrStatus:this.hr.snapshot(this.plan.sampleMaxAgeMs).status,
+      dataScope:this.plan.scope,
+      safetyState:this.safety.state,
       hrZone: this.hrZone,
       hrManual: this.hr.manual,
       rpePrimary: this.rpePrimary,   // 无设备/β阻滞剂 → RPE 主控（HUD 显示用）
@@ -842,6 +896,9 @@ export class Game {
     const r = this.canvas.getBoundingClientRect();
     this.canvas.width = Math.round(r.width * dpr);
     this.canvas.height = Math.round(r.height * dpr);
+    // 根据真实控制栏高度放置景点标题，兼容手机双行顶栏与横屏。
+    const hud = this.canvas.parentElement?.querySelector('.hud-top');
+    this._bannerY = hud ? Math.max(70, hud.getBoundingClientRect().bottom - r.top + 4) : 70;
   }
 
   _render(now) {
@@ -849,7 +906,7 @@ export class Game {
     const W = this.canvas.width / (this._dpr || 1);
     const H = this.canvas.height / (this._dpr || 1);
     ctx.setTransform(this._dpr || 1, 0, 0, this._dpr || 1, 0, 0);
-    const t = now / 1000;
+    const t = this.simTime;
 
     const scene = SCENES[this.journey.sceneIndex];
 
@@ -877,8 +934,8 @@ export class Game {
         const x = w.x * W, y = w.y * H;
         const g = cachedGrad('wrist', () => {
           const gr = ctx.createRadialGradient(0, 0, 2, 0, 0, 26);
-          gr.addColorStop(0, 'rgba(255,235,150,0.9)');
-          gr.addColorStop(1, 'rgba(255,235,150,0)');
+          gr.addColorStop(0, 'rgba(220,239,211,0.85)');
+          gr.addColorStop(1, 'rgba(220,239,211,0)');
           return gr;
         });
         ctx.save();
@@ -959,73 +1016,28 @@ export class Game {
     ctx.save();
     ctx.globalAlpha = 0.88;
     const text = `${scene.name} · 第${this.journey.sceneIndex + 1}站`;
-    ctx.font = `22px ${FONT_KAI}`;
+    ctx.font = `${W <= 600 ? 19 : 22}px ${FONT_KAI}`;
     const w = ctx.measureText(text).width + 60;
-    // y=70：置于 DOM 顶栏（HUD，高约 66 CSS px）下方，避免与"剩余 mm:ss"倒计时重叠
-    roundRect(ctx, W / 2 - w / 2, 70, w, 40, 20);
-    ctx.fillStyle = 'rgba(30,42,56,0.55)';
+    const y = this._bannerY || 70;
+    roundRect(ctx, W / 2 - w / 2, y, w, 40, 12);
+    ctx.fillStyle = 'rgba(19,57,47,0.76)';
     ctx.fill();
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(text, W / 2, 91);
+    ctx.fillText(text, W / 2, y + 21);
     ctx.restore();
   }
 
   _drawAvatar(ctx, W, H) {
-    const x = W * 0.5, groundY = H * 0.94;
-    const s = Math.min(W, H) * 0.13;
     const phase = (this.beatPhase + (this.beatStrong ? 0 : 0.5)) % 1;
-    const bob = Math.sin(phase * Math.PI * 2) * s * 0.04;
-    const y = groundY - s * 1.1 + bob;
+    const height = Math.min(W, H) * .24;
+    const x = W * .5, y = H * .8 + Math.sin(phase * Math.PI * 2) * height * .012;
     ctx.save();
-    // 影子
-    ctx.fillStyle = 'rgba(0,0,0,0.15)';
-    ctx.beginPath(); ctx.ellipse(x, groundY + 4, s * 0.5, s * 0.09, 0, 0, Math.PI * 2); ctx.fill();
-    // 腿
-    const swing = Math.sin(phase * Math.PI * 2) * 0.35;
-    for (const dir of [-1, 1]) {
-      const ang = swing * dir;
-      ctx.save();
-      ctx.translate(x + dir * s * 0.16, y + s * 0.55);
-      ctx.rotate(ang);
-      ctx.fillStyle = '#31465e';
-      roundRect(ctx, -s * 0.09, 0, s * 0.18, s * 0.5, s * 0.08);
-      ctx.fill();
-      ctx.fillStyle = '#8a6d4a';
-      roundRect(ctx, -s * 0.11, s * 0.42, s * 0.22, s * 0.1, s * 0.05);
-      ctx.fill();
-      ctx.restore();
+    ctx.fillStyle = 'rgba(8,31,23,.25)';
+    ctx.beginPath(); ctx.ellipse(x, y + height * .49, height * .28, height * .045, 0, 0, Math.PI * 2); ctx.fill();
+    if (!drawArt(ctx, propArtUrl('traveler'), x, y, height * .75, height)) {
+      drawArtFallback(ctx, x, y, height * .58);
     }
-    // 身体（长衫）
-    ctx.fillStyle = '#3a5a78';
-    roundRect(ctx, x - s * 0.3, y, s * 0.6, s * 0.62, s * 0.12);
-    ctx.fill();
-    // 背包
-    ctx.fillStyle = '#b03a2e';
-    roundRect(ctx, x - s * 0.21, y + s * 0.06, s * 0.42, s * 0.4, s * 0.1);
-    ctx.fill();
-    ctx.fillStyle = '#d4a017';
-    ctx.fillRect(x - s * 0.06, y + s * 0.2, s * 0.12, s * 0.06);
-    // 手臂
-    ctx.fillStyle = '#3a5a78';
-    const armSwing = Math.sin(phase * Math.PI * 2) * 0.3;
-    for (const dir of [-1, 1]) {
-      ctx.save();
-      ctx.translate(x + dir * s * 0.32, y + s * 0.08);
-      ctx.rotate(armSwing * dir);
-      roundRect(ctx, -s * 0.07, 0, s * 0.14, s * 0.45, s * 0.07);
-      ctx.fill();
-      ctx.restore();
-    }
-    // 头 + 斗笠
-    ctx.fillStyle = '#e8c9a0';
-    ctx.beginPath(); ctx.arc(x, y - s * 0.12, s * 0.16, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#d4b96a';
-    ctx.beginPath();
-    ctx.moveTo(x - s * 0.34, y - s * 0.16);
-    ctx.quadraticCurveTo(x, y - s * 0.52, x + s * 0.34, y - s * 0.16);
-    ctx.quadraticCurveTo(x, y - s * 0.24, x - s * 0.34, y - s * 0.16);
-    ctx.closePath(); ctx.fill();
     ctx.restore();
   }
 
@@ -1040,7 +1052,7 @@ export class Game {
       const sc = active ? 1 + pulse * 0.25 : 0.9;
       const alpha = active ? 0.9 - pulse * 0.35 : 0.3;
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = active ? '#e8b83a' : '#5b6b7d';
+      ctx.fillStyle = active ? '#bfd9b6' : '#6c8a80';
       ctx.save();
       ctx.translate(W / 2 + dir * gap, cy);
       ctx.scale(sc, sc);
@@ -1104,81 +1116,27 @@ export class Game {
     // 光晕（按尺寸缓存渐变，避免每帧新建）
     const g = cachedGrad(`item:${Math.round(s)}`, () => {
       const gr = ctx.createRadialGradient(0, 0, s * 0.2, 0, 0, s * 1.8);
-      gr.addColorStop(0, 'rgba(255,230,140,0.5)');
-      gr.addColorStop(1, 'rgba(255,230,140,0)');
+      gr.addColorStop(0, 'rgba(221,235,206,0.32)');
+      gr.addColorStop(1, 'rgba(221,235,206,0)');
       return gr;
     });
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0, 0, s * 1.8, 0, Math.PI * 2); ctx.fill();
 
-    switch (it.kind) {
-      case 'stamp': {
-        ctx.rotate(Math.sin(t + it.seed) * 0.08);
-        ctx.fillStyle = '#c0392b';
-        roundRect(ctx, -s * 0.7, -s * 0.7, s * 1.4, s * 1.4, s * 0.18);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-        ctx.lineWidth = s * 0.07;
-        roundRect(ctx, -s * 0.56, -s * 0.56, s * 1.12, s * 1.12, s * 0.12);
-        ctx.stroke();
-        ctx.fillStyle = '#fff';
-        ctx.font = `700 ${Math.round(s * 1.05)}px ${FONT_KAI}`;
+    if (it.kind === 'stamp') {
+      const url = stampArtUrl(SCENES[this.journey.sceneIndex].id, { gold: !!it.final, compact: true });
+      if (!drawArt(ctx, url, 0, 0, s * 2.05)) drawArtFallback(ctx, 0, 0, s * 2.05, !!it.final);
+      if (it.final) {
+        ctx.fillStyle = '#f6e6bc';
+        ctx.font = `600 ${Math.max(12, Math.round(s * .38))}px system-ui, sans-serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(SCENES[this.journey.sceneIndex].ch, 0, s * 0.06);
-        // 末印：金色脉冲虚线框 + "末印"角标
-        if (it.final) {
-          const pul = 1 + Math.sin(t * 4) * 0.05;
-          ctx.strokeStyle = '#ffd700';
-          ctx.lineWidth = s * 0.08;
-          ctx.setLineDash([s * 0.18, s * 0.11]);
-          ctx.strokeRect(-s * 0.88 * pul, -s * 0.88 * pul, s * 1.76 * pul, s * 1.76 * pul);
-          ctx.setLineDash([]);
-          ctx.fillStyle = '#ffd700';
-          ctx.font = `700 ${Math.round(s * 0.34)}px ${FONT_KAI}`;
-          ctx.fillText('末印', 0, -s * 1.08 * pul);
-        }
-        break;
+        ctx.fillText('末印', 0, -s * 1.3);
       }
-      case 'lantern': {
-        ctx.fillStyle = '#d64541';
-        ctx.beginPath(); ctx.ellipse(0, 0, s * 0.6, s * 0.75, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#f5d76e';
-        ctx.fillRect(-s * 0.18, -s * 0.9, s * 0.36, s * 0.18);
-        ctx.fillRect(-s * 0.18, s * 0.72, s * 0.36, s * 0.16);
-        ctx.beginPath(); ctx.moveTo(0, s * 0.85); ctx.lineTo(-s * 0.14, s * 1.2); ctx.lineTo(s * 0.14, s * 1.2);
-        ctx.closePath(); ctx.fill();
-        break;
-      }
-      case 'flower': {
-        ctx.fillStyle = '#e88ab0';
-        for (let i = 0; i < 6; i++) {
-          ctx.save(); ctx.rotate(i * Math.PI / 3);
-          ctx.beginPath(); ctx.ellipse(0, -s * 0.45, s * 0.26, s * 0.42, 0, 0, Math.PI * 2); ctx.fill();
-          ctx.restore();
-        }
-        ctx.fillStyle = '#f7d774';
-        ctx.beginPath(); ctx.arc(0, 0, s * 0.28, 0, Math.PI * 2); ctx.fill();
-        break;
-      }
-      case 'koi': {
-        ctx.rotate(Math.sin(t * 2 + it.seed) * 0.3);
-        ctx.fillStyle = '#e8792b';
-        ctx.beginPath(); ctx.ellipse(0, 0, s * 0.7, s * 0.34, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(-s * 0.62, 0); ctx.lineTo(-s * 1.05, -s * 0.3); ctx.lineTo(-s * 1.05, s * 0.3);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(s * 0.32, -s * 0.08, s * 0.06, 0, Math.PI * 2); ctx.fill();
-        break;
-      }
-      case 'water': {
-        ctx.fillStyle = '#5dade2';
-        roundRect(ctx, -s * 0.32, -s * 0.62, s * 0.64, s * 1.2, s * 0.2); ctx.fill();
-        ctx.fillStyle = '#3a7ab5';
-        ctx.fillRect(-s * 0.18, -s * 0.82, s * 0.36, s * 0.2);
-        ctx.fillStyle = 'rgba(255,255,255,0.7)';
-        ctx.fillRect(-s * 0.18, -s * 0.4, s * 0.1, s * 0.6);
-        break;
+    } else {
+      ctx.shadowColor = 'rgba(255,255,255,.8)';
+      ctx.shadowBlur = 2;
+      if (!drawArt(ctx, propArtUrl(it.kind), 0, 0, s * 2.2, s * 2.7)) {
+        drawArtFallback(ctx, 0, 0, s * 1.7);
       }
     }
     ctx.restore();
@@ -1202,12 +1160,8 @@ export class Game {
       } else if (e.kind === 'goldstamp') {
         ctx.translate(x, y);
         const s = Math.min(W, H) * 0.12 * (1 + p * 0.6);
-        ctx.fillStyle = '#ffd700';
-        ctx.beginPath(); ctx.arc(0, 0, s, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#a04000';
-        ctx.font = `700 ${Math.round(s)}px ${FONT_KAI}`;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('金', 0, 0);
+        const url = stampArtUrl(SCENES[this.journey.sceneIndex].id, { gold: true, compact: true });
+        if (!drawArt(ctx, url, 0, 0, s * 2)) drawArtFallback(ctx, 0, 0, s * 2, true);
       } else {
         for (let i = 0; i < 6; i++) {
           const a = i * Math.PI / 3 + p * 2;
@@ -1266,16 +1220,10 @@ export class Game {
     ctx.translate(cx, cy);
     ctx.rotate((1 - ease) * 0.4 - 0.08);
     ctx.scale(s / 100, s / 100);
-    // 印章
-    ctx.fillStyle = '#c0392b';
-    roundRect(ctx, -52, -52, 104, 104, 14); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-    ctx.lineWidth = 4;
-    roundRect(ctx, -42, -42, 84, 84, 10); ctx.stroke();
-    ctx.fillStyle = '#fff';
-    ctx.font = `700 64px ${FONT_KAI}`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(c.scene.ch, 0, 4);
+    // 同一套景点纪念章用于收集物、文牒与集齐展示。
+    if (!drawArt(ctx, stampArtUrl(c.scene.id, { gold: true }), 0, 0, 124)) {
+      drawArtFallback(ctx, 0, 0, 124, true);
+    }
     ctx.restore();
     // 文案
     ctx.save();

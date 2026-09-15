@@ -461,23 +461,21 @@ export const SCENES = [
   },
 ];
 
-/** 整理放松阶段的康复小知识（每 20 秒轮换一条）
- *  覆盖 2026 ESC 心脏康复指南核心组件：运动之外，用药依从、戒烟、心理、
- *  营养与减少久坐同样是康复的一部分。 */
+/** General product reminders. Not personalized exercise or medication instructions. */
 export const HEALTH_TIPS = [
-  '运动后不要立刻坐下或洗热水澡，先慢走几分钟，让心率平稳回落。',
-  '运动后补水要小口多次，不要一次猛灌。',
-  '"有点累但还能说话"就是合适的强度，感觉比数字更重要。',
-  '规律运动每周 3~5 次，比偶尔一次练到累更有效。',
-  '如出现胸闷、胸痛、明显气短，请立即停止并告知医生。',
-  '运动前后各做 5 分钟热身和整理，能显著降低心血管风险。',
-  '服用β受体阻滞剂时，请以疲劳感觉（RPE）为准，不要只看心率。',
-  '有氧运动加坐站练习，康复效果会更好。',
-  '按医嘱按时服药和他汀类药物，是心脏康复的基石，别自行停药。',
-  '戒烟一年，冠心病风险可下降约一半——任何时候戒烟都不晚。',
-  '心情低落、睡不好也是心脏康复要管的事，和家人多聊聊，必要时求助医生。',
-  '坐的时间长了，每小时起来走两三分钟，对血管就是很好的照顾。',
-  '饮食少油少盐，蔬果和全谷物多一些，地中海式饮食对心脏很友好。',
+  '运动时长和负荷应以康复团队给出的个体计划为准。',
+  '出现胸痛、胸闷、异常气短或头晕，请停止并及时求助。',
+  '如果计划安排休息，今天可以安心休息，不需要为了集章加练。',
+  '普通疲劳和胸痛等不适不同；不适时请直接使用停止按钮。',
+  '药物或起搏器可能影响心率解读，请由康复团队确定监测方式。',
+  '是否做坐站或其他力量练习，需要结合个人评估与动作教学。',
+  '镜头只用于动作识别，不能判断心脏是否处于安全状态。',
+  '设备没有有效数据时，不要把旧读数当作当前心率。',
+  '没有不适不等于完成医学评估，请按计划要求定期复核。',
+  '按医嘱用药，有疑问时联系医疗团队，不要自行调整。',
+  '睡眠、情绪与日常生活问题，也可以向康复团队反馈。',
+  '如实反馈身体感受，比在游戏里获得更多印章更重要。',
+  '结束后请完成当前状态反馈；出现不适时不要继续本次训练。',
 ];
 
 /* ---------------- 实景照片（按需加载，手机流量/首屏优化） ---------------- */
@@ -539,7 +537,7 @@ function drawPhotoWorld(ctx, W, H, scene, t, distKm, opts = {}) {
   ctx.drawImage(img, (W - dw) / 2 + panX * W, (H - dh) / 2, dw, dh);
   // 轻雾飘动（行进反馈）
   const off = (distKm * PXKM * 0.5) % (W * 1.5);
-  ctx.fillStyle = 'rgba(255,255,255,0.10)';
+  ctx.fillStyle = 'rgba(255,255,255,0.035)';
   for (let i = 0; i < 3; i++) {
     const y = H * (0.34 + i * 0.12);
     const x = ((i * W * 0.7 + off) % (W * 1.5)) - W * 0.25;
@@ -552,31 +550,25 @@ function drawPhotoWorld(ctx, W, H, scene, t, distKm, opts = {}) {
     const bx = ((t * 22) % (W + 300)) - 150;
     birds(ctx, bx, H * 0.16, 110, 'rgba(40,50,60,0.45)', t);
   }
-  // 底部道路（照片渐变过渡，人走在路上）
-  const top = H * 0.8;
-  const g = cachedGrad(`road:${Math.round(H)}`, () => {
-    const gr = ctx.createLinearGradient(0, top - H * 0.1, 0, top + H * 0.04);
-    gr.addColorStop(0, 'rgba(52,64,46,0)');
-    gr.addColorStop(1, 'rgba(52,64,46,0.92)');
+  // 柔和的青绿前景与透视步道，避免横向色块切断实景。
+  const top = H * 0.72;
+  const g = cachedGrad(`road-visual-v135:${Math.round(H)}`, () => {
+    const gr = ctx.createLinearGradient(0, top, 0, H);
+    gr.addColorStop(0, 'rgba(20,53,42,0)');
+    gr.addColorStop(0.6, 'rgba(20,53,42,0.74)');
+    gr.addColorStop(1, 'rgba(15,40,33,0.98)');
     return gr;
   });
   ctx.fillStyle = g;
-  ctx.fillRect(0, top - H * 0.1, W, H * 0.14);
-  ctx.fillStyle = 'rgba(58,70,52,0.95)';
-  ctx.fillRect(0, top + H * 0.04, W, H);
-  ctx.fillStyle = 'rgba(236,224,196,0.92)';
-  ctx.fillRect(0, top + (H - top) * 0.22, W, (H - top) * 0.5);
-  const soff = (distKm * PXKM) % 260;
-  ctx.fillStyle = 'rgba(0,0,0,0.1)';
-  for (let i = -1; i < W / 260 + 2; i++) {
-    const x = i * 260 - soff;
-    ctx.beginPath();
-    ctx.ellipse(x + 40, top + (H - top) * 0.56, 10, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(x + 170, top + (H - top) * 0.4, 7, 4, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  ctx.fillRect(0, top, W, H - top);
+  ctx.fillStyle = 'rgba(198,218,197,0.12)';
+  ctx.beginPath();
+  ctx.moveTo(W * 0.47, H * 0.85);
+  ctx.lineTo(W * 0.53, H * 0.85);
+  ctx.quadraticCurveTo(W * 0.61, H * 0.92, W * 0.74, H);
+  ctx.lineTo(W * 0.26, H);
+  ctx.quadraticCurveTo(W * 0.39, H * 0.92, W * 0.47, H * 0.85);
+  ctx.fill();
   // 顶部渐晕，保证 HUD 可读
   const vg = cachedGrad(`vig:${Math.round(H)}`, () => {
     const gr = ctx.createLinearGradient(0, 0, 0, H * 0.16);

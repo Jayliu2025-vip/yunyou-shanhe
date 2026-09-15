@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>云游山河 · 视觉预览</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#e9efec;color:#173d38;font:14px/1.5 system-ui,'Microsoft YaHei',sans-serif}header{min-height:72px;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;background:#f8faf8;border-bottom:1px solid #d4e0d8}strong{font-size:17px}small{display:block;color:#65786b}nav{display:flex;gap:6px;flex-wrap:wrap}button{font:inherit;min-height:40px;padding:8px 14px;background:white;border:1px solid #ccdbd1;border-radius:10px;color:inherit;cursor:pointer}button[aria-pressed=true]{background:#176d60;border-color:#176d60;color:white}a{color:#176d60}main{height:calc(100dvh - 73px);min-height:300px;display:grid;place-items:center;overflow:hidden;padding:20px}#frame-space{position:relative;flex:none}iframe{position:absolute;top:0;left:0;border:0;border-radius:22px;background:#f4f7f7;transform-origin:top left;box-shadow:0 16px 55px #173d3824;outline:1px solid #c8d9cf}button:focus-visible,a:focus-visible{outline:3px solid #146e59;outline-offset:3px}@media(max-width:600px){header{padding:10px 14px;align-items:flex-start;flex-direction:column;gap:10px}main{height:calc(100dvh - 128px);padding:12px}button{padding:8px 10px}small{font-size:11px}}
+</style>
+</head>
+<body>
+<header><div><strong>云游山河 · 视觉预览</strong><small>青绿山水旅行手册 · v1.4.0 · 本地科研原型</small></div><nav aria-label="预览尺寸"><button data-width="390" data-height="844" aria-pressed="true">手机竖屏</button><button data-width="844" data-height="390" aria-pressed="false">手机横屏</button><button data-width="1180" data-height="820" aria-pressed="false">桌面</button><a href="./index.html" target="_blank" rel="noopener">打开游戏 ↗</a></nav></header>
+<main><div id="frame-space"><iframe title="云游山河游戏预览" src="./index.html"></iframe></div></main>
+<script>
+const frame=document.querySelector('iframe'), space=document.querySelector('#frame-space'), main=document.querySelector('main');
+if(new URLSearchParams(location.search).get('quick')==='1') frame.src='./index.html?quick=1';
+let width=390,height=844;
+function fit(){const scale=Math.min(1,(main.clientWidth-40)/width,(main.clientHeight-40)/height);frame.style.width=width+'px';frame.style.height=height+'px';frame.style.transform='scale('+scale+')';space.style.width=width*scale+'px';space.style.height=height*scale+'px';}
+document.querySelectorAll('button[data-width]').forEach(button=>button.addEventListener('click',()=>{width=Number(button.dataset.width);height=Number(button.dataset.height);document.querySelectorAll('button[data-width]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));fit();}));
+new ResizeObserver(fit).observe(main);fit();
+</script>
+</body></html>

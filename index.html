@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#f6f1e7">
+<meta name="theme-color" content="#f4f7f7">
 <meta name="color-scheme" content="light">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -12,6 +12,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/theme.css">
 </head>
 <body>
 <!-- 开源线性图标：Lucide（ISC License）内联 sprite，stroke 跟随 currentColor 以融入墨色/朱砂主题 -->
@@ -161,63 +162,76 @@
 
   <!-- ============ 主页 ============ -->
   <section id="screen-home" class="screen">
-    <header class="home-hero">
-      <div class="hero-stamp stamp-lg">游</div>
-      <div class="hero-title">
-        <h1>云游山河</h1>
-        <p class="subtitle">心脏康复 · 集章之旅</p>
-      </div>
-      <div class="hero-stamp stamp-lg stamp-red">康</div>
+    <header class="home-brand">
+      <div class="brand-lockup"><span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-mountain"/></svg></span><div><strong>云游山河</strong><span>心脏康复 · 集章之旅</span></div></div>
+      <span class="brand-note">山河作伴，慢慢前行</span>
     </header>
-    <div class="ink-divider" aria-hidden="true"><span class="line"></span><span class="diamond"></span><span class="line"></span></div>
-
-    <p class="home-intro">原地踏步，云游中国十三景；抬手摘印，间歇坐站。<br>集齐通关文牒，让康复像旅行一样有趣。</p>
-
-    <button id="btn-start" class="btn btn-primary btn-xl btn-pulse"><svg class="icon"><use href="#i-footprints"/></svg><span>开始今日旅程</span></button>
-
-    <div class="stat-cards">
-      <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-flame"/></svg></div><div class="stat-num" id="stat-streak">0</div><div class="stat-label">连续打卡（天）</div></div>
-      <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-mountain-snow"/></svg></div><div class="stat-num" id="stat-km">0.0</div><div class="stat-label">累计里程（公里）</div></div>
-      <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-stamp"/></svg></div><div class="stat-num" id="stat-stamps">0</div><div class="stat-label">累计印章（枚）</div></div>
+    <div class="record-context"><label for="view-scope">当前记录</label><select id="view-scope"><option value="demo">演示体验记录</option><option value="clinical">正式康复记录</option></select><span id="home-plan-state">尚未关联康复计划</span></div>
+    <div id="home-hold" class="safety-notice hidden" role="status"></div>
+    <button id="btn-reset-demo-hold" class="btn btn-ghost hidden">重置演示停止状态</button>
+    <div class="home-layout">
+      <div class="home-feature">
+        <div class="home-heading"><p class="eyebrow">把每一步，走成风景</p><h1>今天，去山河间走走。</h1><p>按自己的节奏，收藏一路风景。</p></div>
+        <article class="destination-card">
+          <img id="home-scene-photo" class="destination-photo" src="assets/photos/xihu.jpg" alt="杭州西湖风景" fetchpriority="high">
+          <div class="destination-shade" aria-hidden="true"></div>
+          <div class="destination-top"><span class="destination-label"><svg class="icon"><use href="#i-compass"/></svg> 当前旅程</span><span id="home-scene-index">01 / 13</span></div>
+          <div class="destination-caption"><p id="home-scene-verse">欲把西湖比西子，淡妆浓抹总相宜</p><h2 id="home-scene-name">杭州西湖</h2><div class="destination-bottom"><span><svg class="icon"><use href="#i-stamp"/></svg> 本站已集 <b id="home-scene-stamps">0</b> / 12 枚</span><span class="destination-seal" id="home-scene-seal" aria-hidden="true">湖</span></div></div>
+        </article>
+        <div class="departure-card"><div><strong>准备好，就出发</strong><p>原地踏步 · 抬手集章 · 山河漫游</p></div><button id="btn-start" class="btn btn-primary btn-xl"><svg class="icon"><use href="#i-footprints"/></svg><span>开始今日旅程</span><span aria-hidden="true">↗</span></button></div>
+      </div>
+      <aside class="home-journal" aria-label="我的旅程">
+    <div class="section-heading"><div><p class="eyebrow">一点一滴，都有记录</p><h2>我的旅程</h2></div><svg class="icon" aria-hidden="true"><use href="#i-leaf"/></svg></div>
+    <div class="stat-cards home-stats">
+      <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-flame"/></svg></div><div class="stat-num" id="stat-streak">0</div><div class="stat-label">参与天数</div></div>
+      <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-mountain-snow"/></svg></div><div class="stat-num" id="stat-km">0.0</div><div class="stat-label">累计公里</div></div>
+      <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-stamp"/></svg></div><div class="stat-num" id="stat-stamps">0</div><div class="stat-label">收集印章</div></div>
       <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-medal"/></svg></div><div class="stat-num" id="stat-sessions">0</div><div class="stat-label">训练次数</div></div>
     </div>
 
     <div class="home-actions">
-      <button id="btn-passport" class="btn btn-ghost"><svg class="icon"><use href="#i-book-open"/></svg><span>通关文牒</span></button>
-      <button id="btn-settings" class="btn btn-ghost"><svg class="icon"><use href="#i-settings"/></svg><span>设置与数据</span></button>
+      <button id="btn-passport" class="journal-link"><span class="journal-icon"><svg class="icon"><use href="#i-book-open"/></svg></span><span><strong>通关文牒</strong><small>十三处风景，一本山河记忆</small></span><span class="link-arrow" aria-hidden="true">↗</span></button>
+      <button id="btn-settings" class="journal-link"><span class="journal-icon"><svg class="icon"><use href="#i-settings"/></svg></span><span><strong>设置与数据</strong><small>声音偏好、设备与训练记录</small></span><span class="link-arrow" aria-hidden="true">↗</span></button>
     </div>
-
-    <p class="home-tip" id="home-tip">建议穿着运动鞋，身前 2 米内留出活动空间。</p>
+    <div class="home-reminder"><svg class="icon" aria-hidden="true"><use href="#i-leaf"/></svg><div><strong>照顾好自己的节奏</strong><p class="home-tip" id="home-tip">建议穿着运动鞋，身前 2 米内留出活动空间。</p></div></div>
+      </aside>
+    </div>
   </section>
 
   <!-- ============ 训练准备 ============ -->
   <section id="screen-setup" class="screen hidden">
-    <h2>出发前的准备</h2>
+    <div class="page-heading"><p class="eyebrow">云游山河 · 出发准备</p><h2>准备妥当，再看风景。</h2><p>确认今日状态，调整好手机，按康复计划开始。</p></div>
 
+    <div class="card plan-card">
+      <h3>本次使用方式</h3>
+      <div class="form-row"><label class="radio-pill"><input type="radio" name="session-kind" value="demo" checked>演示体验</label><label class="radio-pill"><input type="radio" name="session-kind" value="clinical">按康复计划训练</label></div>
+      <p id="plan-status" role="status"></p><p id="plan-detail" class="hint"></p>
+      <p class="hint">演示不产生正式康复记录。正式训练需由接入平台提供已验证的有效计划。</p>
+    </div>
+    <p id="start-error" class="form-error" role="alert"></p>
     <div class="setup-grid">
       <div class="setup-col">
         <div class="card">
           <h3>① 安全确认</h3>
           <label class="check-row">
             <input type="checkbox" id="ck-safety">
-            <span>我今天身体状况适合运动。如出现<b>胸闷、胸痛、明显气短、头晕、心悸</b>，会立即停止。</span>
+            <span>我当前没有<b>胸痛、胸闷、异常气短、头晕或明显心悸</b>；出现不适会使用“停止”按钮。</span>
           </label>
+          <label class="check-row"><input type="checkbox" id="ck-no-hold"><span>近期没有被医疗团队要求暂停运动，也没有尚待评估的病情变化。</span></label>
+          <label class="check-row"><input type="checkbox" id="ck-space"><span>手机放置稳定，身边没有障碍物，已了解如何暂停和停止。</span></label>
         </div>
 
-        <div class="card">
-          <h3>② 我的情况</h3>
+        <div class="card" id="demo-options">
+          <h3>② 演示选项</h3>
           <div class="form-row">
             <label>训练场景</label>
             <label class="radio-pill"><input type="radio" name="setting" value="home" checked>居家康复</label>
             <label class="radio-pill"><input type="radio" name="setting" value="clinic">院内监护（医护观察）</label>
           </div>
-          <p class="hint" id="setting-hint">居家版：标准安全策略（心率超上限12秒自动暂停）。</p>
-          <div class="form-row">
-            <label>年龄</label>
-            <input type="number" id="in-age" min="30" max="90" value="55">
-            <label>静息心率</label>
-            <input type="number" id="in-resthr" min="40" max="110" value="70">
-            <span class="unit">次/分</span>
+          <p class="hint" id="setting-hint">场景和负荷由有效计划确定。</p>
+          <div class="vitals-fields">
+            <div class="vital-field"><label for="in-age">年龄</label><div><input type="number" id="in-age" min="30" max="90" value="55"><span>岁</span></div></div>
+            <div class="vital-field"><label for="in-resthr">静息心率</label><div><input type="number" id="in-resthr" min="40" max="110" value="70"><span>次/分</span></div></div>
           </div>
           <div class="form-row">
             <label>体重（热量估算用）</label>
@@ -226,8 +240,9 @@
           </div>
           <label class="check-row">
             <input type="checkbox" id="ck-beta">
-            <span>我服用<b>β受体阻滞剂</b>或装有<b>起搏器</b>（心率指标仅供参考，以疲劳感觉为主）</span>
+            <span>服用<b>β受体阻滞剂</b>（该信息不会关闭计划规定的停止规则）</span>
           </label>
+          <label class="check-row"><input type="checkbox" id="ck-pacemaker"><span>装有起搏器（需要康复团队个体化评估）</span></label>
           <div class="form-row">
             <label>姿势</label>
             <label class="radio-pill"><input type="radio" name="mode" value="standing" checked>站姿</label>
@@ -239,10 +254,10 @@
           </div>
           <label class="check-row">
             <input type="checkbox" id="ck-blocks">
-            <span><b>力量小站</b>：主运动中插入间歇坐站练习（需一把<b>稳固、靠墙、无轮子</b>的椅子；默认关闭，依据老年人身体活动指南力量练习建议）</span>
+            <span><b>力量小站</b>：主运动中插入间歇坐站练习（需一把<b>稳固、靠墙、无轮子</b>的椅子；仅供演示，正式力量处方尚未接入）</span>
           </label>
           <div class="form-row">
-            <label>目标心率（自动计算）</label>
+            <label>心率目标来源</label>
             <b id="hr-zone-text">—</b>
           </div>
         </div>
@@ -262,11 +277,11 @@
           </div>
           <label class="check-row demo-row">
             <input type="checkbox" id="ck-demo">
-            <span><b>演示模式</b>：无需摄像头，用 ←→ 键踏步、<b>↑ 键起坐</b>、鼠标当手（适合展示与调试）</span>
+            <span><b>模拟动作输入</b>：无需摄像头，用按键或触屏体验；取消勾选可用摄像头体验，记录仍属于演示。</span>
           </label>
           <label class="check-row demo-row" id="row-auto">
             <input type="checkbox" id="ck-auto">
-            <span>自动行走（演示模式下自动踏步挥手，完全自动播放）</span>
+            <span>自动播放动作（只用于界面测试，不代表真实运动）</span>
           </label>
         </div>
 
@@ -276,25 +291,25 @@
             <button id="btn-hr" class="btn btn-small">连接蓝牙心率带</button>
             <span id="hr-status">未连接</span>
           </div>
-          <div class="form-row" id="hr-ws-row">
+          <details class="research-options"><summary>研究网关（开发联调用）</summary><div class="form-row" id="hr-ws-row">
             <label>研究设备（津发手环等）</label>
             <input type="text" id="in-hr-ws" placeholder="ws://192.168.1.10:9000" style="flex:1;min-width:150px">
             <button id="btn-hr-ws" class="btn btn-small">接入</button>
           </div>
-          <div class="form-row" id="hr-manual-row">
+          </details><div class="form-row" id="hr-manual-row">
             <label>或手动输入脉搏</label>
             <input type="number" id="in-hr-manual" placeholder="如 105" min="40" max="200">
             <span class="unit">次/分</span>
           </div>
           <p class="hint" id="monitor-hint">当前：未连接心率设备。</p>
-          <p class="hint">蓝牙兼容 Polar、迪卡侬、华为等标准心率带；研究手环可经采集软件以 WebSocket 转发（数据为 JSON，字段名 bpm / hr / heart_rate 均可识别）。<b>不连接设备也可以安全训练</b>：居家康复为国际指南认可的方式（2026 ESC 心脏康复指南），届时游戏将以疲劳自评 + 说话测试 + 症状监护强度。</p>
+          <p class="hint">可选连接兼容的心率设备；具体型号需实测。未连接时不提供实时心率监测，是否适合手机独立训练由康复计划决定。</p>
         </div>
       </div>
     </div>
 
     <div class="setup-actions">
       <button id="btn-back-home" class="btn btn-ghost">返回</button>
-      <button id="btn-begin" class="btn btn-primary btn-xl">出发！</button>
+      <button id="btn-begin" class="btn btn-primary btn-xl">准备好了，出发</button>
     </div>
   </section>
 
@@ -304,7 +319,7 @@
       <canvas id="game-canvas"></canvas>
 
       <!-- HUD 顶栏 -->
-      <div class="hud hud-top">
+      <div class="hud hud-top"><div id="session-mode-label" class="session-mode-line">演示体验 · 不用于正式康复记录</div>
         <div class="hud-phase">
           <span id="hud-phase-label">热身</span>
           <div class="progress"><div id="hud-progress"></div></div>
@@ -318,8 +333,8 @@
         </div>
         <div class="hud-btns">
           <button id="btn-game-sound" class="btn-icon" title="声音开关"><svg class="icon"><use href="#i-volume-2"/></svg></button>
-          <button id="btn-game-pause" class="btn-icon" title="暂停"><svg class="icon"><use href="#i-pause"/></svg></button>
-          <button id="btn-game-stop" class="btn-icon btn-danger" title="结束"><svg class="icon"><use href="#i-square"/></svg></button>
+          <button id="btn-game-pause" class="btn-icon" title="暂停"><svg class="icon"><use href="#i-pause"/></svg><span class="control-label">暂停</span></button>
+          <button id="btn-game-stop" class="btn-icon btn-danger" title="结束"><svg class="icon"><use href="#i-square"/></svg><span class="control-label">结束</span></button>
         </div>
       </div>
 
@@ -336,11 +351,26 @@
       <!-- RPE 快捷按钮 -->
       <button id="btn-rpe-quick" class="btn-rpe-quick">有点累？<br>告诉教练</button>
 
+      <button id="btn-symptom-stop" class="symptom-stop">不舒服，立即停止</button>
+      <div id="safety-overlay" class="overlay hidden"><div class="dialog">
+        <h3>本次运动已停止</h3><p id="safety-reason" class="dialog-sub"></p>
+        <p>不要继续这次训练。请联系康复团队；若胸痛持续、严重气短、晕厥或出现其他疑似急症，请及时拨打120。</p>
+        <p id="safety-save-state" class="hint" role="status"></p>
+        <div class="dialog-btns"><a class="btn btn-danger-solid" href="tel:120">拨打120</a><button id="btn-safety-finish" class="btn btn-ghost">记录并返回</button></div>
+      </div></div>
+      <div id="resume-overlay" class="overlay hidden"><div class="dialog">
+        <h3>继续前，再确认一下</h3>
+        <label class="check-row"><input type="checkbox" id="resume-symptom-free"><span>现在没有胸痛、胸闷、异常气短、头晕或明显心悸。</span></label>
+        <label class="check-row"><input type="checkbox" id="resume-talk"><span>现在可以舒适地说完整句子。</span></label>
+        <div class="form-row"><label for="resume-rpe">当前疲劳自评</label><select id="resume-rpe"><option value="">请选择</option><option value="0">0 · 没有疲劳</option><option value="1">1 · 很轻</option><option value="2">2 · 轻</option><option value="3">3 · 有些疲劳</option><option value="4">4 · 稍累</option><option value="5">5 · 较累</option><option value="6">6 · 很累</option><option value="8">8 · 非常累</option><option value="10">10 · 极累</option></select></div>
+        <label class="check-row hidden" id="resume-phone-row"><input type="checkbox" id="resume-phone"><span>计划允许不依赖实时心率设备；我确认改为手机模式，设备中断将被记录。</span></label>
+        <p id="resume-error" class="form-error" role="alert"></p><div class="dialog-btns"><button id="btn-resume-confirm" class="btn btn-primary">确认后继续</button><button id="btn-resume-end" class="btn btn-ghost">今天到此为止</button></div>
+      </div></div>
       <!-- RPE 自评弹窗 -->
       <div id="rpe-overlay" class="overlay hidden">
         <div class="dialog">
           <h3>现在感觉怎么样？</h3>
-          <p class="dialog-sub">目标：<b>有点累～稍累</b>（还能说话，但唱不了歌）</p>
+          <p class="dialog-sub"><b>项目疲劳自评 · 0–10</b>，请按实际感觉选择。</p>
           <div class="rpe-btns">
             <button class="rpe-btn" data-v="0"><span class="face"><svg class="icon"><use href="#i-laugh"/></svg></span>很轻松<span class="rpe-val">0</span></button>
             <button class="rpe-btn" data-v="1"><span class="face"><svg class="icon"><use href="#i-smile"/></svg></span>轻松<span class="rpe-val">1</span></button>
@@ -348,10 +378,10 @@
             <button class="rpe-btn rpe-target" data-v="3"><span class="face"><svg class="icon"><use href="#i-frown"/></svg></span>有点累<span class="rpe-val">3</span></button>
             <button class="rpe-btn rpe-target" data-v="4"><span class="face"><svg class="icon"><use href="#i-annoyed"/></svg></span>稍累<span class="rpe-val">4</span></button>
             <button class="rpe-btn" data-v="5"><span class="face"><svg class="icon"><use href="#i-angry"/></svg></span>比较累<span class="rpe-val">5</span></button>
-            <button class="rpe-btn" data-v="6"><span class="face"><svg class="icon"><use href="#i-triangle-alert"/></svg></span>很累/难受<span class="rpe-val">6+</span></button>
+            <button class="rpe-btn" data-v="6"><span class="face"><svg class="icon"><use href="#i-triangle-alert"/></svg></span>很累<span class="rpe-val">6+</span></button>
           </div>
-          <p class="hint talk-test hidden" id="rpe-talktest"><svg class="icon"><use href="#i-audio-lines"/></svg> 说话测试：能连贯说话但唱不了歌 = 强度合适；喘得说不出整句，请放慢或休息。</p>
-          <p class="hint">您的回答会自动调整游戏节奏，如实选择就好。</p>
+          <p class="hint talk-test hidden" id="rpe-talktest"><svg class="icon"><use href="#i-audio-lines"/></svg> 请留意说话是否舒适；若出现异常气短或其他不适，请使用“立即停止”。</p>
+          <p class="hint">感觉轻松不会自动加速；不舒服请直接停止，不必先完成自评。</p>
         </div>
       </div>
 
@@ -359,11 +389,11 @@
       <div id="rest-overlay" class="overlay hidden">
         <div class="dialog">
           <h3>休息一下</h3>
-          <p class="dialog-sub" id="rest-reason">心率略高，跟着圆圈深呼吸，恢复后继续。</p>
+          <p class="dialog-sub" id="rest-reason">心率略高，请先停止运动，继续前需要重新确认状态。</p>
           <div class="breath-ball" id="rest-breath"></div>
           <p class="hr-big"><svg class="icon"><use href="#i-heart-pulse"/></svg> <b id="rest-hr">--</b> 次/分 <span id="rest-zone"></span></p>
           <div class="dialog-btns">
-            <button id="btn-rest-resume" class="btn btn-primary">缓过来了，继续</button>
+            <button id="btn-rest-resume" class="btn btn-primary">检查后再决定</button>
             <button id="btn-rest-stop" class="btn btn-ghost">今天到此为止</button>
           </div>
         </div>
@@ -373,9 +403,9 @@
       <div id="pause-overlay" class="overlay hidden">
         <div class="dialog">
           <h3>已暂停</h3>
-          <p class="dialog-sub">想继续时随时回来，山河不会走远。</p>
+          <p class="dialog-sub">已暂停计时与奖励；继续前需要确认当前状态。</p>
           <div class="dialog-btns">
-            <button id="btn-pause-resume" class="btn btn-primary">继续</button>
+            <button id="btn-pause-resume" class="btn btn-primary">继续前检查</button>
             <button id="btn-pause-stop" class="btn btn-ghost">结束训练</button>
           </div>
         </div>
@@ -418,7 +448,7 @@
           <p class="dialog-sub">已完成的运动量会正常记录进通关文牒。</p>
           <div class="dialog-btns">
             <button id="btn-stop-confirm" class="btn btn-danger-solid">结束本次训练</button>
-            <button id="btn-stop-cancel" class="btn btn-ghost">再练一会儿</button>
+            <button id="btn-stop-cancel" class="btn btn-ghost">保持暂停</button>
           </div>
         </div>
       </div>
@@ -427,8 +457,9 @@
 
   <!-- ============ 结算 ============ -->
   <section id="screen-summary" class="screen hidden">
+    <p class="eyebrow summary-kicker">山河手记 · 本次旅程</p>
     <h2 id="summary-title">今日旅程完成！</h2>
-    <p class="summary-sub" id="summary-sub">走的每一步，都算数。</p>
+    <p class="summary-sub" id="summary-sub">走的每一步，都算数。</p><p id="summary-save-state" class="form-error" role="status"></p><button id="btn-retry-save" class="btn btn-ghost hidden">重试保存本次结果</button><div class="summary-recovery"><label class="check-row"><input type="checkbox" id="post-symptom-free"><span>结束后目前没有不适（完成反馈后离开本页）</span></label><button id="btn-post-symptom" class="btn btn-danger">结束后出现不适</button><p class="hint">如有持续胸痛、严重气短或晕厥等急症，请及时拨打120。</p></div>
     <p class="title-award" id="sum-award"></p>
 
     <div class="summary-grid">
@@ -440,7 +471,7 @@
       <div class="stat-cards stat-cards-sm">
         <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-footprints"/></svg></div><div class="stat-num" id="sum-steps">0</div><div class="stat-label">步数</div></div>
         <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-mountain-snow"/></svg></div><div class="stat-num" id="sum-km">0</div><div class="stat-label">公里</div></div>
-        <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-timer"/></svg></div><div class="stat-num" id="sum-min">0</div><div class="stat-label">分钟</div></div>
+        <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-timer"/></svg></div><div class="stat-num" id="sum-min">0</div><div class="stat-label">有效时长 · 分:秒</div></div>
         <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-flame"/></svg></div><div class="stat-num" id="sum-kcal">0</div><div class="stat-label">估算千卡</div></div>
       </div>
     </div>
@@ -458,14 +489,14 @@
 
     <div class="setup-actions">
       <button id="btn-summary-home" class="btn btn-ghost">返回主页</button>
-      <button id="btn-summary-again" class="btn btn-primary">再来一段</button>
+      <button id="btn-summary-again" class="btn btn-primary">返回准备页</button>
     </div>
   </section>
 
   <!-- ============ 通关文牒 ============ -->
   <section id="screen-passport" class="screen hidden">
     <header class="passport-hero">
-      <div class="hero-stamp stamp-lg">牒</div>
+      <div class="passport-mark" aria-hidden="true"><svg class="icon"><use href="#i-book-open"/></svg></div>
       <div>
         <h2>通关文牒</h2>
         <p class="subtitle" id="passport-sub">山河十三景 · 集章之旅</p>
@@ -483,7 +514,7 @@
 
   <!-- ============ 设置与数据 ============ -->
   <section id="screen-settings" class="screen hidden">
-    <h2>设置与数据</h2>
+    <div class="page-heading"><p class="eyebrow">让旅程更合心意</p><h2>设置与数据</h2><p>调整声音偏好，查看与导出你的训练记录。</p></div>
 
     <div class="setup-grid">
       <div class="setup-col">
@@ -506,29 +537,19 @@
           <h3>训练数据</h3>
           <div class="form-row">
             <button id="btn-export-csv" class="btn btn-small">导出 CSV（汇总）</button>
-            <button id="btn-export-json" class="btn btn-small">导出 JSON（完整）</button>
+            <button id="btn-export-json" class="btn btn-small">导出 JSON（当前分区）</button><button id="btn-export-legacy" class="btn btn-small">导出旧版记录（来源未核实）</button>
           </div>
           <p class="hint">CSV 含每次训练的时长、步数、步频、印章、RPE、心率等汇总指标，可直接用 Excel / SPSS 分析。</p>
           <div class="form-row">
-            <button id="btn-clear" class="btn btn-small btn-danger">清空全部本地数据</button>
+            <button id="btn-clear" class="btn btn-small btn-danger">重置演示停止状态</button>
           </div>
         </div>
       </div>
       <div class="setup-col">
         <div class="card">
-          <h3>科研参数（高级）</h3>
-          <p class="hint">调整强度处方后自动保存，下次训练生效。</p>
-          <div class="form-row"><label>储备心率下限 %</label><input type="number" id="cfg-int-lo" min="20" max="70" step="1"></div>
-          <div class="form-row"><label>储备心率上限 %</label><input type="number" id="cfg-int-hi" min="30" max="80" step="1"></div>
-          <div class="form-row"><label>RPE 弹窗间隔（秒）</label><input type="number" id="cfg-rpe-int" min="120" max="600" step="30"></div>
-          <div class="form-row"><label>主运动起始步频</label><input type="number" id="cfg-tempo" min="80" max="120" step="2"></div>
-          <p class="hint" id="cfg-hint"></p>
-        </div>
-        <div class="card">
           <h3>关于</h3>
-          <p class="hint">云游山河 v1.3.4 —— 冠心病 II/III 期（居家）心脏康复体感游戏原型。<br>
-          运动方案：中等强度有氧（踏步）+ 上肢关节活动（摘取）+ 力量小站（间歇坐站，可选开启），三段式课程结构；有氧与安全策略参照 2026 ESC 心脏康复指南与《中国心血管疾病患者居家康复专家共识》，力量与平衡参照《中国人群身体活动指南（2021）》与 WHO《身体活动与久坐行为指南（2020）》。<br>
-          <b>本游戏为科研原型，不能替代医嘱；训练方案请遵康复医师指导。</b></p>
+          <p class="hint"><a class="art-credit-link" href="docs/emblem-preview.html#credits" target="_blank" rel="noopener">纪念章与道具素材署名</a></p>
+          <p class="hint">云游山河 v1.4.0 · 研究演示与康复计划执行原型。正式训练需接入可信计划服务，并经过临床与真机验证。当前未接入医院系统，演示记录不具有医疗效力。</p>
         </div>
       </div>
     </div>

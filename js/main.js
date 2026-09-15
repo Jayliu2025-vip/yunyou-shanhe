@@ -3,13 +3,16 @@
  * 主页 → 准备（安全确认/摄像头/心率带）→ 游戏（HUD/RPE/休息/暂停）
  *      → 结算（数据入库）→ 通关文牒 / 设置
  */
-import { CONFIG, targetHrZone } from './config.js';
+import { CONFIG } from './config.js';
+import { endSessionNotice } from './session-safety.js';
+import { PlanGateway, createDemoPlan, canStartPlan, checkPreflight } from './rehab-plan.js';
 import { AudioCoach } from './audio.js';
 import { HRMonitor } from './hr.js';
 import { BodyInput } from './pose.js';
 import { Game } from './game.js';
 import { SCENES, preloadScenePhotosAround } from './scenes.js';
 import * as store from './storage.js';
+import { stampArtUrl, preloadSceneArt } from './art.js';
 
 const $ = (id) => document.getElementById(id);
 // 内联 Lucide 图标（index.html 顶部 sprite；ISC License）
@@ -30,20 +33,22 @@ if (document.fonts?.load) {
 
 /* ---------------- 全局状态 ---------------- */
 
+let recordScope='demo', clinicalPlan=null, lastCompletedSession=null, pendingCompletion=null;
+let starting=false, startAttempt=0, bodyInitGeneration=0;
+const planGateway=new PlanGateway(); // Host integration supplies authenticated fetch/verification; no default endpoint.
 let settings = store.getSettings();
 const audio = new AudioCoach(settings);
 const hr = new HRMonitor();
 let body = null;            // BodyInput
 let bodyMode = null;        // 'camera' | 'demo'
 let game = null;
-let journey = store.getJourney();
+let journey = store.getJourney(recordScope);
 let selectedMainSec = store.getProfile().mainSec || 1200;
 let prevBadgeIds = [];      // 本次训练前已有的徽章（用于结算时标记新徽章）
 let setupPreviewRaf = null;
 let restTimer = null;
 let wakeLock = null;       // 手机屏幕常亮锁
 
-applyCfgOverrides();
 
 /* ---------------- 屏幕切换 ---------------- */
 
@@ -53,20 +58,45 @@ function showScreen(id) {
   window.scrollTo(0, 0);
 }
 
+function showStampArt(id, scene, { gold = false, compact = false } = {}) {
+  const img = document.createElement('img');
+  img.src = stampArtUrl(scene.id, { gold, compact });
+  img.alt = `${scene.name}${gold ? '金色' : ''}纪念章`;
+  img.className = 'art-emblem';
+  $(id).replaceChildren(img);
+}
+
 /* ---------------- 主页 ---------------- */
 
 function renderHome() {
-  const st = store.streakInfo();
+  const currentJourney = store.getJourney(recordScope);
+  const sceneIndex = Number.isInteger(currentJourney.sceneIndex) && SCENES[currentJourney.sceneIndex] ? currentJourney.sceneIndex : 0;
+  const scene = SCENES[sceneIndex];
+  $('home-scene-photo').src = scene.photo;
+  $('home-scene-photo').alt = `${scene.name}风景`;
+  $('home-scene-name').textContent = scene.name;
+  $('home-scene-verse').textContent = scene.sub;
+  $('home-scene-index').textContent = `${String(sceneIndex + 1).padStart(2, '0')} / ${SCENES.length}`;
+  $('home-scene-stamps').textContent = currentJourney.stampsInScene;
+  showStampArt('home-scene-seal', scene, { compact: true });
+  preloadSceneArt(scene.id);
+  const st = store.participationInfo(recordScope);
+  $('view-scope').value=recordScope;
+  $('home-plan-state').textContent=recordScope==='demo'?'演示体验，不计入正式康复记录':clinicalPlan?'已接入计划，开始前仍需检查':'尚未关联可信康复计划';
+  const hold=store.getHold(recordScope);
+  $('home-hold').classList.toggle('hidden',!hold);
+  $('home-hold').textContent=hold?'上次会话已停止或中断，不能自动继续。正式训练需康复团队复核；演示测试可重置演示状态。':'';
+  $('btn-reset-demo-hold').classList.toggle('hidden',recordScope!=='demo'||!hold);
   $('stat-streak').textContent = st.current;
-  $('stat-km').textContent = store.getJourney().totalKm.toFixed(1);
-  $('stat-stamps').textContent = store.getJourney().stampsTotal;
+  $('stat-km').textContent = store.getJourney(recordScope).totalKm.toFixed(1);
+  $('stat-stamps').textContent = store.getJourney(recordScope).stampsTotal;
   $('stat-sessions').textContent = st.totalSessions;
-  const last = store.lastSessionDate();
+  const last = store.lastSessionDate(recordScope);
   const tips = [
     '建议穿着运动鞋，身前 2 米内留出活动空间。',
     '训练前避免空腹或饱腹，备好温水。',
     '如当日身体不适，休息也是康复的一部分。',
-    '运动中保持"有点累但能说话"的强度最合适。',
+    '按个体计划运动；出现不适请停止并联系康复团队。',
   ];
   let tip = tips[new Date().getDate() % tips.length];
   if (last) {
@@ -84,17 +114,22 @@ function renderSetup() {
   $('in-resthr').value = p.restingHr;
   $('in-weight').value = p.weightKg || 70;
   $('ck-beta').checked = !!p.betaBlocker;
+  $('ck-pacemaker').checked=!!p.pacemaker;
   $('ck-blocks').checked = !!p.strengthBlocks;
   const modeRadio = document.querySelector(`input[name="mode"][value="${p.mode}"]`);
   if (modeRadio) modeRadio.checked = true;
   selectedMainSec = p.mainSec || 1200;
   renderMainSecChoices();
-  $('ck-demo').checked = false;
+  $('ck-demo').checked = true;
+  for(const id of ['ck-safety','ck-no-hold','ck-space']) $(id).checked=false;
+  document.querySelector(`input[name="session-kind"][value="${recordScope}"]`).checked=true;
+  $('start-error').textContent='';
   $('ck-auto').checked = !!settings.autoWalkDemo;
-  $('row-auto').classList.add('hidden');
+  $('row-auto').classList.remove('hidden');
   updateHrZoneText();
   updateMonitorHint();
-  updateCamStatus(bodyMode === 'camera' ? '已就绪 ✓' : '未开启');
+  updateCamStatus(bodyMode === 'camera' ? '摄像头已打开，请确认实际识别状态' : '模拟动作输入已选');
+  updatePlanCard();
 }
 
 function renderMainSecChoices() {
@@ -115,6 +150,7 @@ function currentProfileFromForm() {
     restingHr: clamp(parseInt($('in-resthr').value, 10) || 70, 40, 110),
     weightKg: clamp(parseInt($('in-weight').value, 10) || 70, 35, 150),
     betaBlocker: $('ck-beta').checked,
+    pacemaker:$('ck-pacemaker').checked,
     mode: document.querySelector('input[name="mode"]:checked').value,
     mainSec: selectedMainSec,
     strengthBlocks: $('ck-blocks').checked,   // 力量小站（间歇坐站），默认关闭
@@ -122,16 +158,19 @@ function currentProfileFromForm() {
 }
 
 function updateHrZoneText() {
-  const p = currentProfileFromForm();
-  const clinic = getSettingMode() === 'clinic';
-  const z = targetHrZone(p.age, p.restingHr, {
-    ...CONFIG.medical,
-    intensityHigh: clinic ? CONFIG.medical.clinic.intensityHigh : CONFIG.medical.intensityHigh,
-  });
-  $('hr-zone-text').textContent = `${z.low} ~ ${z.high} 次/分${clinic ? '（院内·保守）' : ''}`;
-  $('setting-hint').textContent = clinic
-    ? '院内监护版：强度上限更保守（50%储备心率），心率超限8秒自动暂停，RPE 每3分钟询问一次，便于医护观察。'
-    : '居家版：标准安全策略（心率超上限12秒自动暂停，RPE 每5分钟询问）。';
+  $('hr-zone-text').textContent=clinicalPlan?.hrZone?`${clinicalPlan.hrZone.low}–${clinicalPlan.hrZone.high} 次/分（来自已验证计划）`:'演示不生成目标心率';
+  $('setting-hint').textContent='场景和运动负荷由计划确定；演示选项不构成康复处方。';
+}
+function isClinicalMode() { return document.querySelector('input[name="session-kind"]:checked')?.value==='clinical'; }
+function updatePlanCard() {
+  const clinical=isClinicalMode();
+  $('plan-status').textContent=clinical?(clinicalPlan?'计划已验证':'尚未接入可信康复计划服务'):'演示计划 · 仅供功能体验';
+  $('plan-detail').textContent=clinical?(clinicalPlan?`${clinicalPlan.id} · ${clinicalPlan.version}`:'不使用年龄公式生成处方，也不会把自我勾选视为医生签发。'):(QUICK?'快速演示：20秒热身 / 90秒主段 / 20秒整理':'演示参数用于软件体验，请勿据此安排患者训练。');
+  $('btn-begin').disabled=starting || (clinical && !canStartPlan(clinicalPlan).ok);
+  $('demo-options').classList.toggle('hidden',clinical);
+  $('ck-demo').disabled=clinical;
+  if(clinical) $('ck-demo').checked=false;
+  $('row-auto').classList.toggle('hidden',clinical||!$('ck-demo').checked);
 }
 
 function getSettingMode() {
@@ -141,20 +180,9 @@ function getSettingMode() {
 
 /* 准备页：当前强度监护方式提示（无设备安全模式的一等公民入口） */
 function updateMonitorHint() {
-  const el = $('monitor-hint');
-  if (!el) return;
-  const live = hr.connected && !hr.manual;
-  const beta = $('ck-beta').checked;
-  if (live && !beta) {
-    el.innerHTML = '当前：已连接心率设备 —— 心率监护 + RPE 双保险。';
-  } else if (live && beta) {
-    el.innerHTML = '当前：已连接心率设备，但因 β 受体阻滞剂，仍以<b>疲劳感觉（RPE）</b>为主控。';
-  } else if (hr.manual) {
-    el.innerHTML = '当前：手动脉搏（单次参考值）—— 强度以<b>疲劳自评 RPE</b>为主，每 3 分钟询问一次。';
-  } else {
-    el.innerHTML = '当前：<b>未连接心率设备</b> —— 强度以<b>疲劳自评 + 说话测试 + 症状</b>监护，'
-      + '每 3 分钟询问一次（符合 2026 ESC 心脏康复指南与《中国心血管疾病患者居家康复专家共识》）。';
-  }
+  const state=hr.snapshot(clinicalPlan?.sampleMaxAgeMs||5000);
+  const labels={idle:'未连接设备',connecting:'连接中',waiting:'已连接，等待有效数据',connected:'收到实时心率数据',disconnected:'连接已中断',stale:'数据已过期',manual:'手动脉搏，仅作单次记录',unsupported:'当前环境不支持此连接方式','contact-lost':'设备报告接触丢失','invalid-sample':'设备数据无效'};
+  $('monitor-hint').textContent=(labels[state.status]||'未实时监测心率')+'。设备数据不代表医疗安全判断。';
 }
 
 async function initCameraInSetup() {
@@ -195,103 +223,101 @@ function stopSetupPreview() {
 }
 
 async function ensureBody(mode) {
-  if (body && bodyMode === mode) return body;
-  if (body) { body.stop(); body = null; bodyMode = null; }
-  body = new BodyInput($('cam-video'), $('game-cam-preview'));
-  await body.init({ demo: mode === 'demo', autoWalk: settings.autoWalkDemo });
-  bodyMode = mode;
-  return body;
+  if(body && bodyMode===mode) return body;
+  const generation=++bodyInitGeneration;
+  if(body) body.stop(); body=null; bodyMode=null;
+  const candidate=new BodyInput($('cam-video'),$('game-cam-preview'));
+  body=candidate;
+  try {await candidate.init({demo:mode==='demo',autoWalk:settings.autoWalkDemo});}
+  catch(e) {candidate.stop();if(body===candidate){body=null;bodyMode=null;}throw e;}
+  if(generation!==bodyInitGeneration || body!==candidate) { candidate.stop(); throw new Error('输入初始化已取消'); }
+  bodyMode=mode; return candidate;
 }
 
 /* ---------------- 开始训练 ---------------- */
 
 async function startSession() {
-  if (!$('ck-safety').checked) {
-    alert('请先勾选安全确认，确认今天适合运动。');
-    return;
-  }
-  const profile = currentProfileFromForm();
-  store.saveProfile(profile);
-
-  audio.ensure();
-  hideAllOverlays();
-
-  // 输入模式：演示 or 摄像头
-  const wantDemo = $('ck-demo').checked;
+  if(starting || game?.running) return;
+  const clinical=isClinicalMode(), scope=clinical?'clinical':'demo';
+  $('start-error').textContent='';
+  if(store.getHold(scope)) { $('start-error').textContent='上次会话仍有停止或中断标记。请返回首页查看；正式训练需要复核。'; return; }
+  if(!['ck-safety','ck-no-hold','ck-space'].every(id=>$(id).checked)) { $('start-error').textContent='请先逐项确认今日状态与活动环境；如有不适，不要开始。'; return; }
+  const profile=currentProfileFromForm();
+  let plan;
+  try { plan=clinical?clinicalPlan:createDemoPlan({quick:QUICK,mainSec:selectedMainSec,mode:profile.mode,strengthBlocks:profile.strengthBlocks}); }
+  catch(e) { $('start-error').textContent=e.message; return; }
+  if(!canStartPlan(plan).ok) { $('start-error').textContent='缺少已验证的有效康复计划，不能开始正式训练。'; return; }
+  if(typeof crypto.randomUUID!=='function') { $('start-error').textContent='当前环境无法创建可靠会话标识，请使用受支持的HTTPS环境。'; return; }
+  const attempt=++startAttempt;
+  starting=true; updatePlanCard();
   try {
-    await ensureBody(wantDemo ? 'demo' : 'camera');
-  } catch (e) {
-    alert('摄像头开启失败，可勾选"演示模式"先体验。\n' + (e.message || e));
-    return;
-  }
-  settings.autoWalkDemo = $('ck-auto').checked;
-  store.saveSettings(settings);
-  if (bodyMode === 'demo') body.autoWalk = settings.autoWalkDemo;
+    const wantDemo=!clinical && $('ck-demo').checked;
+    const input=await ensureBody(wantDemo?'demo':'camera');
+    if(attempt!==startAttempt || $('screen-setup').classList.contains('hidden') || document.hidden) {cleanupBody();return;}
+    const bodyState=input.update(performance.now());
+    const checks=checkPreflight({symptomFree:$('ck-safety').checked,notOnHold:$('ck-no-hold').checked,spaceReady:$('ck-space').checked,plan,hrReady:hr.snapshot(plan.sampleMaxAgeMs).ready,bodyReady:bodyState.ok});
+    if(!checks.ok) { $('start-error').textContent=checks.errors.join('；'); if(bodyMode==='camera') startSetupPreview(); return; }
+    const sessionId=crypto.randomUUID();
+    const marker=store.beginSession({sessionId,planId:plan.id,planVersion:plan.version},scope);
+    if(!marker.ok) { $('start-error').textContent=marker.error; return; }
+    recordScope=scope;
+    if(scope==='demo') store.saveProfile(profile,'demo');
+    settings.autoWalkDemo=wantDemo && $('ck-auto').checked; store.saveSettings(settings);
+    if(bodyMode==='demo') body.autoWalk=settings.autoWalkDemo;
+    audio.ensure(); audio.resumeSessionAudio(); hideAllOverlays();
+    stopSetupPreview(); journey=store.getJourney(scope); prevBadgeIds=store.badges(scope).filter(b=>b.got).map(b=>b.id);
+    rotateDismissed=true;
+    showScreen('screen-game'); syncSoundBtn();
+    $('session-mode-label').textContent=scope==='demo'?'演示体验 · 不用于正式康复记录':`按计划执行 · ${plan.version}`;
+    $('btn-symptom-stop').disabled=false; $('btn-symptom-stop').textContent='不舒服，立即停止';
+    body.setPointerTarget($('game-canvas'));
+    $('game-cam-preview').classList.toggle('hidden',bodyMode!=='camera');
+    const showTap=bodyMode==='demo' && IS_MOBILE;
+    $('btn-tap-step').classList.toggle('hidden',!showTap);
+    document.querySelector('.game-wrap').classList.toggle('has-tap',showTap);
+    const effectiveProfile=clinical?{mode:plan.mode,age:null,restingHr:null,weightKg:null,betaBlocker:null,pacemaker:null}:profile;
+    game=new Game({canvas:$('game-canvas'),body,hr,audio,profile:effectiveProfile,journey,settings,onEvent:onGameEvent,onHud:updateHud});
+    if(!game.start(plan,{sessionId,inputSource:bodyMode==='demo'?'simulated':clinical?'camera':'camera-demo'})) throw new Error('计划验证失败');
+    if(IS_MOBILE && navigator.wakeLock) {
+      try { const lock=await navigator.wakeLock.request('screen'); if(attempt!==startAttempt||!game?.running||document.hidden) await lock.release(); else wakeLock=lock; } catch {}
+    }
+    rotateHint();
+  } catch(e) { $('start-error').textContent='无法开始：'+(e.message||'请检查输入状态'); if(game?.running) game.safetyStop('startup-error'); else showScreen('screen-setup'); }
+  finally { starting=false; updatePlanCard(); }
+}
 
-  const clinic = getSettingMode() === 'clinic';
-  const plan = QUICK
-    ? { ...CONFIG.session.quickTest, mode: profile.mode, quick: true }
-    : { warmupSec: CONFIG.session.warmupSec, mainSec: selectedMainSec, cooldownSec: CONFIG.session.cooldownSec, mode: profile.mode, quick: false };
-  plan.hrZone = targetHrZone(profile.age, profile.restingHr, {
-    ...CONFIG.medical,
-    intensityHigh: clinic ? CONFIG.medical.clinic.intensityHigh : CONFIG.medical.intensityHigh,
-  });
-  plan.setting = clinic ? 'clinic' : 'home';
-  plan.strengthBlocks = !!profile.strengthBlocks;   // 力量小站由设置页勾选开启（默认关闭）
-  if (clinic) {
-    plan.hrOverLimitSec = CONFIG.medical.clinic.hrOverLimitPauseSec;
-    plan.rpePromptIntervalSec = CONFIG.medical.clinic.rpePromptIntervalSec;
-  }
-
-  // 监护方式（无设备安全模式，依据 2026 ESC 心脏康复指南 + 中国居家康复共识）：
-  // 蓝牙/研究设备实时心率 → 'hr'；手动脉搏 → 'manual'；未连接 → 'rpe'
-  // 非实时心率时 RPE 为主控，询问间隔收紧至 noDevice.rpePromptIntervalSec（180s）
-  const liveHr = hr.connected && !hr.manual;
-  plan.monitor = liveHr ? 'hr' : (hr.manual ? 'manual' : 'rpe');
-  if (plan.monitor !== 'hr') {
-    plan.rpePromptIntervalSec = CONFIG.medical.noDevice.rpePromptIntervalSec;
-  }
-
-  // 手机：屏幕常亮（防锻炼中途锁屏）+ 提示横屏
-  if (IS_MOBILE && navigator.wakeLock) {
-    try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* 忽略 */ }
-  }
-
-  stopSetupPreview();
-  journey = store.getJourney();
-  prevBadgeIds = store.badges().filter(b => b.got).map(b => b.id);
-  rotateDismissed = false;   // 新一局重新给一次横屏建议
-
-  showScreen('screen-game');
-  syncSoundBtn();
-  body.setPointerTarget($('game-canvas'));
-  $('game-cam-preview').classList.toggle('hidden', bodyMode !== 'camera');
-  // 演示模式 + 触屏设备 → 显示踏步按钮（并上移步频条避免重叠）
-  const showTap = bodyMode === 'demo' && IS_MOBILE;
-  $('btn-tap-step').classList.toggle('hidden', !showTap);
-  document.querySelector('.game-wrap').classList.toggle('has-tap', showTap);
-  rotateHint();
-
-  game = new Game({
-    canvas: $('game-canvas'),
-    body, hr, audio, profile, journey, settings,
-    onEvent: onGameEvent,
-    onHud: updateHud,
-  });
-  game.start(plan);
+function showResumeReview() {
+  if(!game?.running || game.safety.terminal) return;
+  hideAllOverlays();
+  for(const id of ['resume-symptom-free','resume-talk','resume-phone']) $(id).checked=false;
+  $('resume-rpe').value=''; $('resume-error').textContent='';
+  const lost=(game.monitor==='hr'||game.plan.requiredHr)&&!hr.snapshot(game.plan.sampleMaxAgeMs).ready;
+  $('resume-phone-row').classList.toggle('hidden',!(lost&&game.plan.allowHrFallback));
+  $('resume-overlay').classList.remove('hidden');
+}
+function confirmResume() {
+  const raw=$('resume-rpe').value;
+  const ok=game?.resume({reviewed:true,symptomFree:$('resume-symptom-free').checked,talkComfortable:$('resume-talk').checked,rpe:raw===''?NaN:Number(raw),usePhone:$('resume-phone').checked});
+  if(ok) { hideAllOverlays(); audio.speak('已完成检查，继续按原计划进行。',true); }
+  else $('resume-error').textContent='尚未满足继续条件。请完成自评并确认设备、动作输入及计划有效；如有不适，请立即停止。';
+}
+function showSafetyStop(reason) {
+  hideAllOverlays();
+  const result=store.lockSafety({sessionId:game.sessionId,reason},game.plan.scope);
+  $('safety-reason').textContent=reason==='symptom'?'你报告了不适，本次会话不可恢复。':'计划或必要输入触发了停止条件，本次会话不可恢复。';
+  $('safety-save-state').textContent=result.ok?'停止状态已保存在本机。未向医疗团队发送通知。':'停止状态写入失败；开始时的会话标记将阻止自动继续。请联系康复团队。';
+  $('safety-overlay').classList.remove('hidden');
+  $('btn-symptom-stop').disabled=true; $('btn-symptom-stop').textContent='已停止 · 本次不可恢复';
+  audio.speak('本次运动已停止。不要继续。如有持续胸痛、严重气短或晕厥，请及时求助。',true);
 }
 
 /* ---------------- 游戏事件 ---------------- */
 
 /* RPE 自评弹窗（定时询问与 HUD 快捷按钮共用）：RPE 主控时附说话测试提示 */
 function openRpeDialog() {
-  const rp = !!(game && game.rpePrimary);
-  $('rpe-talktest').classList.toggle('hidden', !rp);
-  $('rpe-overlay').classList.remove('hidden');
-  audio.speak(rp
-    ? '现在感觉怎么样？记住，能连贯说话、但唱不了歌，就是合适的强度。请如实选择。'
-    : '现在感觉怎么样？请如实选择您的疲劳程度。', true);
-  audio.vibrate(30);
+  if(!game?.running || game.safety.terminal) return;
+  $('rpe-talktest').classList.remove('hidden'); $('rpe-overlay').classList.remove('hidden');
+  audio.speak('请按实际感觉选择疲劳程度。如果不舒服，请立即停止。',true);
 }
 
 function onGameEvent(ev) {
@@ -302,18 +328,14 @@ function onGameEvent(ev) {
     case 'scene-intro':
       showSceneIntro(ev.scene, ev.auto);
       break;
-    case 'hr-pause': {
-      const reason = ev.reason === 'rpe'
-        ? '您反馈了明显疲劳，先休息一下——缓过来再决定继续或结束。'
-        : `心率 ${ev.bpm} 次/分，略高于目标上限。跟着圆圈深呼吸，恢复后继续。`;
-      const endTip = ev.reason === 'rpe'
-        ? '（如仍有不适，建议今天到此为止）'
-        : (ev.suggestEnd ? '（今天已多次需要休息，如仍有不适建议结束训练）' : '');
-      $('rest-reason').textContent = reason + endTip;
-      $('rest-overlay').classList.remove('hidden');
-      startRestHrWatcher();
-      break;
+    case 'input-pause': {
+      if(game?.safety.terminal) break;
+      hideAllOverlays();
+      const labels={'device-lost':'实时数据已中断、过期或来源改变。','pose-lost':'动作识别失效，请检查手机与入镜位置。','rpe-hard':'你报告了明显疲劳。','background':'页面曾切到后台。','runtime-gap':'运行发生中断，计时已暂停。','clock-error':'检测到时钟异常。'};
+      $('rest-reason').textContent=(labels[ev.reason]||'训练已暂停。')+' 继续前需要重新检查。';
+      $('rest-overlay').classList.remove('hidden'); startRestHrWatcher(); break;
     }
+    case 'safety-stop': showSafetyStop(ev.reason); break;
     case 'end':
       handleSessionEnd(ev.session, ev.journey);
       break;
@@ -323,14 +345,14 @@ function onGameEvent(ev) {
 /* ---------------- 景点介绍卡 ---------------- */
 
 function showSceneIntro(scene, auto = true) {
-  if (!scene) return;
+  if (!scene || game?.safety.terminal) return;
   // 开场介绍的 pause 在 game.start() 同步执行期内调用会失效，延后一帧
   const g = game;
-  const doPause = () => { if (g && g.running && !g.paused) g.pause('scene-intro'); };
+  const doPause=()=>{if(g===game && g?.running && !g.safety.terminal) g.pause('scene-intro');};
   $('scene-intro-img').src = scene.photo;
   $('scene-intro-img').onerror = function () { this.style.display = 'none'; };
   $('scene-intro-img').style.display = '';
-  $('scene-intro-ch').textContent = scene.ch;
+  showStampArt('scene-intro-ch', scene, { compact: true });
   $('scene-intro-name').textContent = scene.name;
   $('scene-intro-sub').textContent = scene.sub;
   $('scene-intro-text').textContent = scene.intro || '';
@@ -338,22 +360,15 @@ function showSceneIntro(scene, auto = true) {
     .map(t => `<span>${t}</span>`).join('');
   $('btn-scene-intro-ok').textContent = auto ? '继续行走' : '知道了';
   $('scene-intro-overlay').classList.remove('hidden');
-  if (auto) {
-    if (g) setTimeout(doPause, 0);
-  }
+  doPause();
 }
 
 function hideSceneIntro() {
   $('scene-intro-overlay').classList.add('hidden');
-  if (game && game.running && game.pauseReason === 'scene-intro') {
-    game.pauseReason = null;
-    game.resume();
-  }
+  if(game?.running) game.resume({release:'scene-intro'});
 }
-
 function hideAllOverlays() {
-  ['rpe-overlay', 'rest-overlay', 'pause-overlay', 'stop-overlay', 'scene-intro-overlay']
-    .forEach(id => $(id).classList.add('hidden'));
+  ['rpe-overlay','rest-overlay','pause-overlay','stop-overlay','scene-intro-overlay','resume-overlay','safety-overlay','rotate-overlay'].forEach(id=>$(id).classList.add('hidden'));
   stopRestHrWatcher();
 }
 
@@ -369,15 +384,11 @@ window.addEventListener('resize', rotateHint);
 
 function startRestHrWatcher() {
   stopRestHrWatcher();
-  restTimer = setInterval(() => {
-    const bpm = hr.bpm;
-    $('rest-hr').textContent = bpm || '--';
-    const zone = $('rest-zone');
-    if (!bpm || !game || !game.hrZone) { zone.textContent = ''; return; }
-    if (bpm > game.hrZone.high) { zone.textContent = '仍偏高，再休息一会儿'; zone.style.color = '#b03a2e'; }
-    else if (bpm >= game.hrZone.low) { zone.textContent = '已回到目标区间 ✓'; zone.style.color = '#3d7a6a'; }
-    else { zone.textContent = '恢复良好'; zone.style.color = '#3d7a6a'; }
-  }, 1000);
+  restTimer=setInterval(()=>{
+    const state=hr.snapshot(game?.plan.sampleMaxAgeMs||5000);
+    $('rest-hr').textContent=state.bpm??'--';
+    $('rest-zone').textContent=state.ready?'当前读数，不等同于可以恢复':state.source==='manual'?'单次手动记录':'未收到有效实时数据';
+  },500);
 }
 function stopRestHrWatcher() {
   if (restTimer) { clearInterval(restTimer); restTimer = null; }
@@ -409,12 +420,10 @@ function updateHud(h) {
     $('hud-block-time').textContent = blk.remain;
   }
   const chip = $('hud-hr-chip');
-  $('hud-hr').textContent = h.hr || (h.rpePrimary ? 'RPE主控' : '--');
-  chip.title = !h.hr
-    ? '未连接心率设备：以疲劳自评(RPE)+说话测试+症状监护强度'
-    : (h.hrManual ? '手动脉搏（单次参考值），以 RPE 为主控' : '实时心率');
-  chip.classList.toggle('zone-high', !!h.hr && !h.hrManual && h.hrZone && h.hr > h.hrZone.high);
-  chip.classList.toggle('zone-ok', !!h.hr && !h.hrManual && h.hrZone && h.hr >= h.hrZone.low && h.hr <= h.hrZone.high);
+  $('hud-hr').textContent=(h.hrManual&&h.hr?`手动 ${h.hr}`:h.hr)??(h.hrStatus==='stale'?'数据过期':'未监测心率');
+  chip.title=h.hrManual?'手动脉搏，不是实时监测':h.hr?'当前设备读数，不能据此判断医疗安全':'无有效实时心率';
+  chip.classList.remove('zone-ok');
+  chip.classList.toggle('zone-high',!!h.hr && !!game?.plan.hrStopAbove && h.hr>game.plan.hrStopAbove);
 }
 
 /* ---------------- 结算 ---------------- */
@@ -424,61 +433,62 @@ function handleSessionEnd(session, updatedJourney) {
   $('btn-tap-step').classList.add('hidden');
   document.querySelector('.game-wrap').classList.remove('has-tap');
   if (wakeLock) { try { wakeLock.release(); wakeLock = null; } catch (e) {} }
-  store.addSession(session);
-  store.saveJourney(updatedJourney);
+  recordScope=session.dataScope; lastCompletedSession=session; pendingCompletion={session,journey:updatedJourney};
+  const saved=store.commitSession(session,updatedJourney,recordScope);
+  $('btn-retry-save').classList.toggle('hidden',saved.ok);
+  $('summary-save-state').classList.toggle('save-error',!saved.ok);
+  $('summary-save-state').textContent=saved.ok?(saved.warning||'已保存在本机，尚未同步到医疗平台。'):saved.error;
+  $('post-symptom-free').checked=false;
+  $('btn-summary-again').disabled=!!store.getHold(recordScope);
   journey = updatedJourney;
+  cleanupBody();hr.disconnect();
 
   const done = session.endedBy === 'completed';
-  // 语音播报本次成绩（手机端不用看屏幕也知道结果）
-  if (done) {
-    audio.gong();
-    audio.speak(`本次训练完成！共走 ${session.steps} 步，收获 ${session.stampsEarned} 枚印章。今天很棒，明天见！`, true);
-  } else {
-    audio.speak('今天的部分已经记录下来了，好好休息，明天继续。', true);
-  }
-  $('summary-title').textContent = done ? '今日旅程完成！' : '今日旅程已记录';
+  const safetyEnded=session.endedBy==='safety';
+  if(done && saved.ok && !safetyEnded) {audio.resumeSessionAudio();audio.gong();}
+  audio.speak(endSessionNotice(session,saved.ok),true);
+  $('summary-title').textContent=safetyEnded?'本次已因停止条件结束':saved.ok?(session.dataScope==='demo'?'演示旅程已记录':'本次旅程已记录'):'本次结果尚未保存';
   // 今日称号（趣味反馈：按完成度与出勤给称号，与运动强度无关，不诱导加练）
   const fullScene = (session.scenesCompleted > 0) || session.stampsEarned >= CONFIG.game.stampCardNeed;
-  $('sum-award').innerHTML = done
+  $('sum-award').innerHTML = safetyEnded?iconSvg('i-leaf')+'<span>适时停止，照顾自己</span>':!saved.ok?'<span>结果待保存</span>':done
     ? (fullScene ? iconSvg('i-trophy') + '<span>山河行者 · 集齐一整站</span>' : iconSvg('i-footprints') + '<span>健步旅人</span>')
     : (fullScene ? iconSvg('i-trophy') + '<span>山河行者 · 集齐一整站</span>'
       : session.steps >= 300 ? iconSvg('i-leaf') + '<span>小憩游人 · 明天继续</span>' : iconSvg('i-sprout') + '<span>明日再会</span>');
-  const st = store.streakInfo();
-  $('summary-sub').textContent = done
-    ? `连续打卡 ${st.current} 天 · 走的每一步，都算数。`
-    : '完成的部分已记录，明天继续，山河都在。';
+  const st = store.participationInfo(recordScope);
+  $('summary-sub').textContent=session.dataScope==='demo'?'演示数据单独保存，不计入正式康复记录。':safetyEnded?'本次会话不可恢复，请联系康复团队复核。':'按计划完成或适时休息，都值得如实记录。';
 
   // 印章主字：本次到访的最后一个景点
   const lastName = session.sceneNames[session.sceneNames.length - 1];
   const lastScene = SCENES.find(s => s.name === lastName) || SCENES[0];
-  $('summary-stamp-ch').textContent = lastScene.ch;
+  // 最后到访景点未必是本次集齐的景点，结算封面不据此授予金色章。
+  showStampArt('summary-stamp-ch', lastScene);
   $('sum-stamps').textContent = session.stampsEarned;
   $('sum-steps').textContent = session.steps;
   $('sum-km').textContent = session.distanceKm.toFixed(2);
-  $('sum-min').textContent = Math.max(1, Math.round(session.durationSec.total / 60));
-  $('sum-kcal').textContent = Math.round(session.kcal);
+  $('sum-min').textContent = fmtTime(session.durationSec.total);
+  $('sum-kcal').textContent=Number.isFinite(session.kcal)?Math.round(session.kcal):'—';
 
   // 强度回顾
   const d = [];
-  d.push(`平均步频 <b>${session.avgCadence}</b> 步/分（最高 ${session.maxCadence}）`);
+  d.push(session.samples?.length?`有效样本平均步频 <b>${session.avgCadence}</b> 步/分（最高 ${session.maxCadence}）`:'步频采样不足，不计算均值');
   if (session.rpeSamples.length) {
     d.push('疲劳自评 RPE：' + session.rpeSamples.map(r =>
-      `<b>${r.v}</b>（${Math.max(1, Math.round(r.t / 60))}分钟时）`).join('、'));
+      `<b>${r.v}</b>（开始后${Math.round(r.t)}秒）`).join('、'));
   } else {
     d.push('疲劳自评 RPE：本次未记录');
   }
   if (session.hrAvg) {
-    const z = session.snapshot.hrZone;
-    d.push(`平均心率 <b>${session.hrAvg}</b>，峰值 <b>${session.hrMax}</b> 次/分（目标 ${z.low}~${z.high}）`);
+    d.push(`有效样本平均心率 <b>${session.hrAvg}</b>，最高 <b>${session.hrMax}</b> 次/分（非医疗安全结论）`);
     if (session.autoPauses) d.push(`心率自动暂停 <b>${session.autoPauses}</b> 次`);
   } else {
     const monText = {
-      rpe: '本次未连接心率设备 —— 按指南以 <b>RPE + 说话测试 + 症状</b>主控（每 3 分钟询问）',
+      rpe: '本次未实时监测心率；请结合已批准计划与实际症状',
       manual: '手动脉搏模式 —— 以疲劳自评（RPE）为主控',
     };
     d.push('心率：' + (monText[session.monitor] || '本次未连接心率带（以疲劳感觉控制强度）'));
   }
-  if (session.snapshot.betaBlocker) d.push('服用β受体阻滞剂：已按 RPE 为主控强度');
+  d.push('自评量表：项目0–10（非Borg 6–20换算）');
+  d.push('计划版本：'+String(session.planVersion).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
   if (session.strengthBlocks) {
     d.push(`力量小站：完成 <b>${session.blocksRun || 0}</b> 组，共 <b>${session.sitStandReps || 0}</b> 次坐站起坐`);
   }
@@ -488,7 +498,7 @@ function handleSessionEnd(session, updatedJourney) {
   drawHrSpark(session);
 
   // 徽章
-  const all = store.badges();
+  const all = store.badges(recordScope);
   $('summary-badges').innerHTML = all.map(b => `
     <div class="badge ${b.got ? '' : 'locked'}" ${b.got && !prevBadgeIds.includes(b.id) ? 'style="border-color:#c9971e;background:#fff6dd"' : ''}>
       <span class="badge-ico">${iconSvg(b.icon)}</span>
@@ -541,7 +551,7 @@ function drawHrSpark(session) {
 /* ---------------- 通关文牒 ---------------- */
 
 function renderPassport() {
-  const j = store.getJourney();
+  const j = store.getJourney(recordScope);
   $('passport-sub').textContent = `山河十三景 · 集章之旅${j.rounds > 0 ? ` · 已环游 ${j.rounds} 圈` : ''}`;
   const total = SCENES.length * CONFIG.game.stampCardNeed;
   $('journey-fill').style.width = Math.min(100, j.stampsTotal / total * 100) + '%';
@@ -551,9 +561,10 @@ function renderPassport() {
     const earned = j.rounds > 0 || i < j.sceneIndex;
     const current = i === j.sceneIndex;
     const cls = earned ? 'earned' : (current ? 'current' : 'locked');
-    const stampInner = earned ? s.ch : (current ? `${j.stampsInScene}/${CONFIG.game.stampCardNeed}` : iconSvg('i-lock'));
+    const stampInner = `<img class="art-emblem" src="${stampArtUrl(s.id, { gold: earned })}" alt="${s.name}${earned ? '已获得金色纪念章' : current ? '当前纪念章' : '待收集纪念章'}" loading="lazy">`;
     const prog = current ? `<div class="scene-progress-text">集章进度 ${j.stampsInScene}/${CONFIG.game.stampCardNeed}</div>` : '';
     return `<div class="scene-card ${cls}" data-ch="${s.ch}">
+      <div class="passport-photo-wrap"><img class="passport-photo" src="${s.photo}" alt="${s.name}风景" loading="lazy"><span class="passport-number">${String(i + 1).padStart(2, '0')}</span></div>
       <div class="scene-name">${s.name}</div>
       <div class="scene-sub">${s.sub}</div>
       <div class="scene-stamp">${stampInner}</div>
@@ -568,11 +579,7 @@ function renderSettings() {
   $('set-sound').checked = settings.sound;
   $('set-speech').checked = settings.speech;
   fillVoiceSelect();
-  $('cfg-int-lo').value = CONFIG.medical.intensityLow;
-  $('cfg-int-hi').value = CONFIG.medical.intensityHigh;
-  $('cfg-rpe-int').value = CONFIG.medical.rpePromptIntervalSec;
-  $('cfg-tempo').value = CONFIG.tempo.start;
-  updateCfgHint();
+
 }
 
 /* 教练声音下拉：自动 + 设备可用中文语音按性别分组（男女患者可选） */
@@ -596,32 +603,6 @@ function fillVoiceSelect() {
   if (!sel.value && sel.selectedIndex === -1) sel.selectedIndex = 0;
 }
 
-function updateCfgHint() {
-  const p = store.getProfile();
-  const z = targetHrZone(p.age, p.restingHr);
-  $('cfg-hint').textContent = `按当前档案（${p.age}岁，静息心率 ${p.restingHr}）：目标心率 ${z.low}~${z.high} 次/分。`;
-}
-
-function applyCfgOverrides() {
-  const cfg = settings.cfg || {};
-  if (cfg.intensityLow != null) CONFIG.medical.intensityLow = cfg.intensityLow;
-  if (cfg.intensityHigh != null) CONFIG.medical.intensityHigh = cfg.intensityHigh;
-  if (cfg.rpePromptIntervalSec != null) CONFIG.medical.rpePromptIntervalSec = cfg.rpePromptIntervalSec;
-  if (cfg.tempoStart != null) CONFIG.tempo.start = cfg.tempoStart;
-}
-
-function saveCfgFromInputs() {
-  settings.cfg = {
-    intensityLow: clamp(parseFloat($('cfg-int-lo').value) || 0.4, 0.2, 0.7),
-    intensityHigh: clamp(parseFloat($('cfg-int-hi').value) || 0.6, 0.3, 0.8),
-    rpePromptIntervalSec: clamp(parseInt($('cfg-rpe-int').value, 10) || 300, 120, 600),
-    tempoStart: clamp(parseInt($('cfg-tempo').value, 10) || 104, 80, 120),
-  };
-  applyCfgOverrides();
-  store.saveSettings(settings);
-  updateCfgHint();
-}
-
 /* ---------------- 游戏内声音开关 ---------------- */
 
 function syncSoundBtn() {
@@ -636,6 +617,7 @@ function syncSoundBtn() {
 function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
 function cleanupBody() {
+  ++bodyInitGeneration;
   stopSetupPreview();
   if (body) { body.stop(); body = null; bodyMode = null; }
   hr.clearManual();
@@ -658,6 +640,7 @@ function bind() {
     r.onchange = updateHrZoneText;
   });
   $('ck-demo').onchange = () => {
+    ++startAttempt;
     const demo = $('ck-demo').checked;
     $('row-auto').classList.toggle('hidden', !demo);
     if (demo && bodyMode === 'camera') {
@@ -666,7 +649,7 @@ function bind() {
       } else { $('ck-demo').checked = false; $('row-auto').classList.add('hidden'); }
     }
   };
-  $('btn-back-home').onclick = () => { cleanupBody(); renderHome(); showScreen('screen-home'); };
+  $('btn-back-home').onclick = () => { ++startAttempt; cleanupBody(); renderHome(); showScreen('screen-home'); };
   $('btn-begin').onclick = startSession;
 
   // 心率带
@@ -688,23 +671,18 @@ function bind() {
 
   // 游戏按钮
   $('btn-game-pause').onclick = () => {
-    if (!game) return;
+    if (!game?.running || game.safety.terminal) return;
     audio.pauseCue();
     audio.speak('已暂停，想继续时随时回来。');
     game.pause('manual');
     $('pause-overlay').classList.remove('hidden');
   };
   $('btn-game-stop').onclick = () => {
-    if (!game) return;
+    if (!game?.running || game.safety.terminal) return;
     game.pause('manual-stop');
     $('stop-overlay').classList.remove('hidden');
   };
-  $('btn-pause-resume').onclick = () => {
-    audio.resumeCue();
-    audio.speak('继续加油！');
-    game && game.resume();
-    $('pause-overlay').classList.add('hidden');
-  };
+  $('btn-pause-resume').onclick=showResumeReview;
   $('btn-pause-stop').onclick = () => {
     $('pause-overlay').classList.add('hidden');
     game && game.stop('user');
@@ -734,13 +712,7 @@ function bind() {
     if (!game || !game.running) return;
     game.skipBlock();   // 内部已带跳过语音与事件记录
   };
-  $('btn-rest-resume').onclick = () => {
-    $('rest-overlay').classList.add('hidden');
-    stopRestHrWatcher();
-    audio.resumeCue();
-    audio.speak('好的，我们继续，跟着脚印的节奏慢慢来。', true);
-    game && game.resume();
-  };
+  $('btn-rest-resume').onclick=showResumeReview;
   $('btn-rest-stop').onclick = () => {
     $('rest-overlay').classList.add('hidden');
     stopRestHrWatcher();
@@ -749,11 +721,13 @@ function bind() {
 
   // 结算
   $('btn-summary-home').onclick = () => {
+    if(lastCompletedSession) store.finalizeSession(lastCompletedSession.sessionId,lastCompletedSession.dataScope);
     cleanupBody();
     renderHome();
     showScreen('screen-home');
   };
-  $('btn-summary-again').onclick = () => { startSession(); };
+  $('btn-summary-again').onclick=()=>{if(!lastCompletedSession||!store.finalizeSession(lastCompletedSession.sessionId,lastCompletedSession.dataScope).ok)return;cleanupBody();renderSetup();showScreen('screen-setup');};
+  $('btn-retry-save').onclick=()=>{if(pendingCompletion)handleSessionEnd(pendingCompletion.session,pendingCompletion.journey);};
 
   // 通关文牒
   $('btn-passport-back').onclick = () => { renderHome(); showScreen('screen-home'); };
@@ -786,24 +760,47 @@ function bind() {
       [2700, () => audio.milestone()],
       [3300, () => audio.finalStamp()],
     ];
-    seq.forEach(([t, fn]) => setTimeout(fn, t));
+    const revision=audio.revision;
+    seq.forEach(([t,fn])=>setTimeout(()=>{if(audio.revision===revision)fn();},t));
   };
-  ['cfg-int-lo', 'cfg-int-hi', 'cfg-rpe-int', 'cfg-tempo'].forEach(id => {
-    $(id).onchange = saveCfgFromInputs;
-  });
   $('btn-export-csv').onclick = () => {
-    if (!store.getSessions().length) { alert('暂无训练记录'); return; }
-    store.downloadFile(store.exportCSV(), `云游山河-训练记录-${new Date().toISOString().slice(0, 10)}.csv`);
+    if (!store.getSessions(recordScope).length) { alert('暂无训练记录'); return; }
+    store.downloadFile(store.exportCSV(recordScope), `云游山河-训练记录-${new Date().toISOString().slice(0, 10)}.csv`);
   };
   $('btn-export-json').onclick = () => {
-    if (!store.getSessions().length) { alert('暂无训练记录'); return; }
-    store.downloadFile(store.exportJSON(), `云游山河-完整数据-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+    if (!store.getSessions(recordScope).length) { alert('暂无训练记录'); return; }
+    store.downloadFile(store.exportJSON(recordScope), `云游山河-完整数据-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
   };
-  $('btn-clear').onclick = () => {
-    if (confirm('确定清空全部本地数据（档案、训练记录、集章进度）？此操作不可恢复。')) {
-      store.resetAll();
-      location.reload();
+  $('btn-export-legacy').onclick=()=>store.downloadFile(store.exportLegacyJSON(),'云游山河-旧版未核实记录.json','application/json');
+  const resetDemo=()=>{if(recordScope!=='demo'){alert('正式训练停止状态需由康复团队复核。');return;} const result=store.clearDemoHold();if(!result.ok){alert(result.error);return;}renderHome();showScreen('screen-home');};
+  $('btn-clear').onclick=resetDemo;
+  $('btn-reset-demo-hold').onclick=resetDemo;
+  $('view-scope').onchange=()=>{recordScope=$('view-scope').value;renderHome();};
+  document.querySelectorAll('input[name="session-kind"]').forEach(input=>input.onchange=async()=>{
+    ++startAttempt;
+    if(isClinicalMode()) { const result=await planGateway.load(); clinicalPlan=result.ok?result.plan:null; }
+    else $('ck-demo').checked=true;
+    $('start-error').textContent='';updatePlanCard();
+  });
+  $('btn-symptom-stop').onclick=()=>game?.safetyStop('symptom');
+  $('btn-safety-finish').onclick=()=>game?.stop('safety');
+  $('btn-resume-confirm').onclick=confirmResume;
+  $('btn-resume-end').onclick=()=>game?.stop('user');
+  $('post-symptom-free').onchange=()=>{
+    if(lastCompletedSession && $('post-symptom-free').checked) {
+      const result=store.savePostCheck(lastCompletedSession.sessionId,true,lastCompletedSession.dataScope);
+      $('summary-save-state').textContent=result.ok?'结束后反馈已保存在本机。离开此页后完成本次记录。':result.error;
+      if(!result.ok) $('post-symptom-free').checked=false;
+      $('btn-summary-again').disabled=!result.ok || store.getHold(lastCompletedSession.dataScope)?.state==='SAFETY_STOPPED';
     }
+  };
+  $('btn-post-symptom').onclick=()=>{
+    if(!lastCompletedSession) return;
+    $('post-symptom-free').checked=false;
+    const hold=store.lockSafety({sessionId:lastCompletedSession.sessionId,reason:'post-session-symptom'},lastCompletedSession.dataScope);
+    store.savePostCheck(lastCompletedSession.sessionId,false,lastCompletedSession.dataScope);
+    $('summary-save-state').textContent='请勿继续训练，联系康复团队；持续胸痛、严重气短或晕厥等情况请及时拨打120。'+(hold.ok?'已保存停止复核状态。':'状态写入失败。');
+    $('btn-summary-again').disabled=true;
   };
 
   // 景点介绍卡
@@ -825,6 +822,7 @@ function bind() {
     if (s === 'connected') $('hr-status').textContent = `已连接 ${hr.deviceName} ✓`;
     else if (s === 'disconnected') $('hr-status').textContent = '设备已断开';
     updateMonitorHint();
+    if(game?.running && !game.safety.terminal) game.checkInputs();
   };
 
   // 演示模式触屏踏步（手机演示）
@@ -853,7 +851,7 @@ function bind() {
     settings.speech = on;
     store.saveSettings(settings);
     syncSoundBtn();
-    if (on) {
+    if (on && !game?.safety.terminal) {
       audio.ensure();
       audio.resumeCue();
       audio.speak('声音已开启。', true);
@@ -861,6 +859,15 @@ function bind() {
       try { window.speechSynthesis.cancel(); } catch (e) { /* 忽略 */ }
     }
   };
+
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden) {
+      ++startAttempt;
+      if(game?.running && !game.safety.terminal) {game.pause('background');onGameEvent({type:'input-pause',reason:'background'});}
+      if(wakeLock){try{wakeLock.release();}catch{}wakeLock=null;}
+    }
+  });
+  setInterval(()=>{updateMonitorHint();if(game?.running)game.checkInputs();},500);
 
   // 页面关闭时释放摄像头与屏幕常亮锁
   window.addEventListener('beforeunload', () => {

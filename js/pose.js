@@ -174,7 +174,14 @@ export class BodyInput {
       try {
         const res = this.landmarker.detectForVideo(this.video, now);
         this.lm = (res.landmarks && res.landmarks[0]) || null;
-      } catch (e) { /* 偶发帧错误忽略 */ }
+        this._poseSeenAt=this.lm?now:null;
+        if(!this.lm) this.sm=null;
+      } catch { this.lm=null;this.sm=null;this._poseSeenAt=null; }
+    }
+    const age=now-this._poseSeenAt;
+    if(this._poseSeenAt==null || age<0 || age>(this.poseMaxAgeMs||1000)) {
+      this.lm=null;this.sm=null;
+      return {ok:false,mode:'camera',wrists:null,reach:defaultReach(),steps:this.steps,cadence:0,sitStand:{reps:this.sitStandReps,ok:false},legsVisible:false};
     }
     if (this.lm) this._smooth();
     return this._computeState(now);
